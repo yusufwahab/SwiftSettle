@@ -1,91 +1,164 @@
-import { useState } from 'react';
-import Sidebar from '../components/Sidebar';
-import SettlementModal from '../components/SettlementModal';
-
-const transactions = [
-  { type: 'Delivery completed', time: '2:15 PM', amount: '+₦1,250' },
-  { type: 'Delivery completed', time: '1:42 PM', amount: '+₦980' },
-  { type: 'Delivery completed', time: '12:30 PM', amount: '+₦1,100' },
-  { type: 'Delivery completed', time: '11:05 AM', amount: '+₦870' },
-  { type: 'Delivery completed', time: '9:50 AM', amount: '+₦300' },
-];
+import { useState } from "react";
+import AppLayout from "../components/layout/AppLayout";
+import Card from "../components/ui/Card";
+import Button from "../components/ui/Button";
+import Badge from "../components/ui/Badge";
+import Skeleton from "../components/ui/Skeleton";
+import { ErrorState, EmptyState } from "../components/ui/States";
+import SettlementModal from "../components/SettlementModal";
+import { formatNaira } from "../lib/format";
+import { walletService } from "../services";
+import { useAsync } from "../hooks/useAsync";
 
 export default function Dashboard() {
-  const [showModal, setShowModal] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const balanceState = useAsync(() => walletService.getBalance(), []);
+  const activityState = useAsync(() => walletService.getTodayActivity(), []);
+  const paymentState = useAsync(() => walletService.getPaymentMethod(), []);
 
   return (
-    <div className="flex min-h-screen bg-[#F9FAFB]">
-      <Sidebar />
-      <main className="ml-[280px] flex-1 p-10">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-[28px] font-bold text-[#1F2937]">Dashboard</h1>
-          <p className="text-[14px] text-[#6B7280]">Monday, July 3rd, 2026 | 2:34 PM</p>
-        </div>
+    <AppLayout title="Dashboard">
+      <BalanceCard
+        state={balanceState}
+        onSettle={() => setModalOpen(true)}
+      />
 
-        {/* Balance Card */}
-        <div className="bg-[#2563EB] rounded-lg p-8 flex items-center justify-between mb-6 shadow-[0_4px_6px_rgba(0,0,0,0.1)]">
-          <div>
-            <p className="text-[12px] font-medium text-white/90 mb-1">Available Balance</p>
-            <p className="text-[36px] font-bold text-white mb-1">₦12,450</p>
-            <p className="text-[12px] text-white/80">Updated 2 minutes ago</p>
+      <div className="mt-6 grid gap-5 sm:grid-cols-3">
+        <SummaryCard
+          label="Today's Earnings"
+          loading={balanceState.status === "loading"}
+          value={balanceState.data && formatNaira(balanceState.data.todayEarnings)}
+          footer={
+            balanceState.data && (
+              <span className="text-success">
+                +{formatNaira(balanceState.data.todayTrend)} from yesterday
+              </span>
+            )
+          }
+        />
+        <SummaryCard
+          label="Pending Payouts"
+          loading={balanceState.status === "loading"}
+          value={balanceState.data && formatNaira(balanceState.data.pendingPayouts)}
+          footer={<span className="text-success">All settled</span>}
+        />
+        <SummaryCard
+          label="This Week's Total"
+          loading={balanceState.status === "loading"}
+          value={balanceState.data && formatNaira(balanceState.data.weekTotal)}
+          footer={balanceState.data && <span>{balanceState.data.weekDays} days of work</span>}
+        />
+      </div>
+
+      <Card className="mt-6">
+        <p className="mb-2 text-sm font-bold text-ink">Today's Activity</p>
+        {activityState.status === "loading" && (
+          <div className="space-y-3 py-3">
+            <Skeleton className="h-5" />
+            <Skeleton className="h-5" />
+            <Skeleton className="h-5 w-2/3" />
           </div>
-          <button
-            onClick={() => setShowModal(true)}
-            className="bg-[#10B981] text-white px-8 py-3 text-[14px] font-semibold rounded hover:bg-[#059669] cursor-pointer transition-colors"
-          >
-            Settle Now
+        )}
+        {activityState.status === "error" && (
+          <ErrorState message={activityState.error} onRetry={activityState.reload} className="py-8" />
+        )}
+        {activityState.status === "success" && activityState.data.length === 0 && (
+          <EmptyState title="No activity yet today" className="py-8" />
+        )}
+        {activityState.status === "success" && activityState.data.length > 0 && (
+          <div>
+            {activityState.data.map((row, index) => (
+              <div
+                key={row.id}
+                className={`flex items-center justify-between py-3 text-sm ${
+                  index < activityState.data.length - 1 ? "border-b border-border" : ""
+                }`}
+              >
+                <span className="text-ink">{row.label}</span>
+                <span className="text-muted">{row.time}</span>
+                <span className="font-medium text-success">+{formatNaira(row.amount)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card className="mt-6">
+        <div className="mb-4 flex items-center justify-between">
+          <p className="text-sm font-bold text-ink">Your Payment Methods</p>
+          <button type="button" className="text-sm text-primary hover:text-primary-dark">
+            Edit
           </button>
         </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-3 gap-5 mb-6">
-          <div className="bg-white p-6 rounded-lg border border-[#E5E7EB]">
-            <p className="text-[12px] text-[#6B7280] mb-2">Today's Earnings</p>
-            <p className="text-[24px] font-bold text-[#1F2937] mb-1">₦4,500</p>
-            <p className="text-[12px] text-[#10B981]">+₦1,200 from yesterday</p>
-          </div>
-          <div className="bg-white p-6 rounded-lg border border-[#E5E7EB]">
-            <p className="text-[12px] text-[#6B7280] mb-2">Pending Payouts</p>
-            <p className="text-[24px] font-bold text-[#1F2937] mb-1">₦0</p>
-            <p className="text-[12px] text-[#10B981]">All settled</p>
-          </div>
-          <div className="bg-white p-6 rounded-lg border border-[#E5E7EB]">
-            <p className="text-[12px] text-[#6B7280] mb-2">This Week's Total</p>
-            <p className="text-[24px] font-bold text-[#1F2937] mb-1">₦28,750</p>
-            <p className="text-[12px] text-[#6B7280]">7 days of work</p>
-          </div>
-        </div>
-
-        {/* Activity */}
-        <div className="bg-white rounded-lg border border-[#E5E7EB] p-6 mb-6">
-          <p className="text-[14px] font-bold text-[#1F2937] mb-4">Today's Activity</p>
-          {transactions.map((t, i) => (
-            <div key={i} className={`flex items-center justify-between py-3 ${i < transactions.length - 1 ? 'border-b border-[#E5E7EB]' : ''}`}>
-              <span className="text-[14px] text-[#1F2937]">{t.type}</span>
-              <span className="text-[14px] text-[#6B7280]">{t.time}</span>
-              <span className="text-[14px] text-[#10B981] font-medium">{t.amount}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Payment Methods */}
-        <div className="bg-white rounded-lg border border-[#E5E7EB] p-6">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-[14px] font-bold text-[#1F2937]">Your Payment Methods</p>
-            <button className="text-[14px] text-[#2563EB] cursor-pointer hover:underline">Edit</button>
-          </div>
+        {paymentState.status === "loading" && <Skeleton className="h-12" />}
+        {paymentState.status === "error" && (
+          <ErrorState message={paymentState.error} onRetry={paymentState.reload} className="py-4" />
+        )}
+        {paymentState.status === "success" && (
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[14px] font-medium text-[#1F2937]">Guaranty Trust Bank (GTB)</p>
-              <p className="text-[14px] text-[#6B7280]">**** **** **** 5678 · Chioma Adeyemi</p>
+              <p className="text-sm font-medium text-ink">{paymentState.data.name}</p>
+              <p className="text-sm text-muted">
+                {paymentState.data.accountNumberMasked} · {paymentState.data.accountHolder}
+              </p>
             </div>
-            <span className="bg-[#2563EB] text-white text-[12px] px-2 py-1 rounded">Primary account</span>
+            {paymentState.data.isPrimary && <Badge tone="primary">Primary account</Badge>}
           </div>
-        </div>
-      </main>
+        )}
+      </Card>
 
-      {showModal && <SettlementModal onClose={() => setShowModal(false)} />}
-    </div>
+      <SettlementModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        balance={balanceState.data?.available ?? 0}
+        onSettled={balanceState.reload}
+      />
+    </AppLayout>
+  );
+}
+
+function BalanceCard({ state, onSettle }) {
+  if (state.status === "loading") {
+    return (
+      <Card className="p-8">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="mt-3 h-10 w-48" />
+      </Card>
+    );
+  }
+
+  if (state.status === "error") {
+    return (
+      <Card className="p-8">
+        <ErrorState message={state.error} onRetry={state.reload} className="py-4" />
+      </Card>
+    );
+  }
+
+  return (
+    <Card padded={false} className="flex flex-col gap-6 p-8 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wide text-muted">Available Balance</p>
+        <p className="mt-2 text-4xl font-bold text-ink">{formatNaira(state.data.available)}</p>
+        <p className="mt-2 text-xs text-muted">Updated {state.data.updatedAt}</p>
+      </div>
+      <Button variant="success" onClick={onSettle} className="px-8 py-3.5">
+        Settle Now
+      </Button>
+    </Card>
+  );
+}
+
+function SummaryCard({ label, value, loading, footer }) {
+  return (
+    <Card>
+      <p className="text-xs text-muted">{label}</p>
+      {loading ? (
+        <Skeleton className="mt-2 h-7 w-24" />
+      ) : (
+        <p className="mt-1.5 text-2xl font-bold text-ink">{value}</p>
+      )}
+      {!loading && footer && <p className="mt-1.5 text-xs">{footer}</p>}
+    </Card>
   );
 }

@@ -1,133 +1,210 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import UnsplashImage from '../components/UnsplashImage';
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import Photo from "../components/Photo";
+import Button from "../components/ui/Button";
+import { TextField, SelectField, Checkbox } from "../components/ui/Field";
+import { nigerianBanks } from "../data/mockData";
+import { authService } from "../services";
+import { useAuth } from "../context/AuthContext";
 
-const BANKS = ['Guaranty Trust Bank (GTB)', 'First Bank', 'Access Bank', 'United Bank for Africa (UBA)', 'Zenith Bank', 'Fidelity Bank', 'Sterling Bank', 'Polaris Bank', 'Wema Bank', 'Union Bank'];
+const initialForm = {
+  fullName: "",
+  email: "",
+  phone: "",
+  dob: "",
+  accountNumber: "",
+  bank: "",
+  accountType: "Savings",
+  password: "",
+  confirmPassword: "",
+  otp: "",
+};
 
 export default function SignupPage() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', email: '', phone: '', dob: '', accountNumber: '', bank: '', accountType: 'Savings', password: '', confirmPassword: '', otp: '' });
+  const { completeSignup } = useAuth();
+
+  const [form, setForm] = useState(initialForm);
   const [otpSent, setOtpSent] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [otpError, setOtpError] = useState("");
+  const [formError, setFormError] = useState("");
 
-  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const id = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(id);
+  }, [countdown]);
 
-  const sendOtp = () => {
-    setOtpSent(true);
-    setCountdown(30);
-    const t = setInterval(() => setCountdown(c => { if (c <= 1) { clearInterval(t); return 0; } return c - 1; }), 1000);
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const sendOtp = async () => {
+    setOtpError("");
+    try {
+      await authService.requestOtp(form.phone);
+      setOtpSent(true);
+      setCountdown(30);
+    } catch (err) {
+      setOtpError(err.message);
+    }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setFormError("");
+    if (form.password !== form.confirmPassword) {
+      setFormError("Passwords do not match.");
+      return;
+    }
     setSubmitting(true);
-    setTimeout(() => navigate('/dashboard'), 1500);
+    try {
+      await completeSignup({
+        fullName: form.fullName,
+        email: form.email,
+        phone: form.phone,
+        bank: { name: form.bank, accountNumber: form.accountNumber, accountHolder: form.fullName },
+      });
+      navigate("/app/dashboard");
+    } catch (err) {
+      setFormError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
-
-  const inputCls = 'w-full border border-[#D1D5DB] px-4 py-3 text-[14px] rounded focus:outline-none focus:border-[#2563EB]';
 
   return (
-    <div className="flex min-h-screen">
-      {/* Left: Form */}
-      <div className="w-1/2 bg-white p-[60px] overflow-y-auto">
-        <Link to="/" className="text-[24px] font-bold text-[#2563EB] block mb-8">SwiftSettle</Link>
-        <h1 className="text-[32px] font-bold text-[#1F2937] mb-2">Get Started</h1>
-        <p className="text-[16px] text-[#6B7280] mb-8">Create your SwiftSettle account in 2 minutes</p>
+    <div className="flex min-h-screen flex-col lg:flex-row">
+      <div className="w-full px-6 py-16 sm:px-10 lg:w-1/2 lg:px-16">
+        <div className="mx-auto max-w-sm">
+          <Link to="/" className="text-xl font-bold text-primary">
+            SwiftSettle
+          </Link>
+          <h1 className="mt-8 text-3xl font-bold text-ink">Get Started</h1>
+          <p className="mb-8 mt-2 text-base text-muted">Create your SwiftSettle account in 2 minutes</p>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          {/* Step 1 */}
-          <p className="text-[12px] font-bold text-[#6B7280] uppercase tracking-wide">Step 1 — Personal Information</p>
-          <div>
-            <label className="block text-[14px] font-medium text-[#1F2937] mb-1">Full Name</label>
-            <input value={form.name} onChange={set('name')} placeholder="Chioma Adeyemi" className={inputCls} required />
-          </div>
-          <div>
-            <label className="block text-[14px] font-medium text-[#1F2937] mb-1">Email Address</label>
-            <input type="email" value={form.email} onChange={set('email')} placeholder="chioma@example.com" className={inputCls} required />
-          </div>
-          <div>
-            <label className="block text-[14px] font-medium text-[#1F2937] mb-1">Phone Number</label>
-            <input type="tel" value={form.phone} onChange={set('phone')} placeholder="+234 (0) 800 000 0000" className={inputCls} required />
-          </div>
-          <div>
-            <label className="block text-[14px] font-medium text-[#1F2937] mb-1">Date of Birth</label>
-            <input type="text" value={form.dob} onChange={set('dob')} placeholder="DD/MM/YYYY" className={inputCls} required />
-          </div>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-subtle">
+              Personal information
+            </p>
+            <TextField label="Full Name" value={form.fullName} onChange={set("fullName")} placeholder="Chioma Adeyemi" required />
+            <TextField label="Email Address" type="email" value={form.email} onChange={set("email")} placeholder="chioma@example.com" required />
+            <TextField label="Phone Number" type="tel" value={form.phone} onChange={set("phone")} placeholder="+234 (0) 800 000 0000" required />
+            <TextField label="Date of Birth" value={form.dob} onChange={set("dob")} placeholder="DD/MM/YYYY" required />
 
-          {/* Step 2 */}
-          <p className="text-[12px] font-bold text-[#6B7280] uppercase tracking-wide mt-2">Step 2 — Bank Details</p>
-          <div>
-            <label className="block text-[14px] font-medium text-[#1F2937] mb-1">Bank Account Number</label>
-            <input value={form.accountNumber} onChange={set('accountNumber')} placeholder="1234567890" className={inputCls} required />
-            <p className="text-[12px] text-[#6B7280] mt-1">Where we'll settle your earnings</p>
-          </div>
-          <div>
-            <label className="block text-[14px] font-medium text-[#1F2937] mb-1">Select Your Bank</label>
-            <select value={form.bank} onChange={set('bank')} className={inputCls} required>
+            <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-subtle">Bank details</p>
+            <TextField
+              label="Bank Account Number"
+              value={form.accountNumber}
+              onChange={set("accountNumber")}
+              placeholder="1234567890"
+              help="Where we'll settle your earnings"
+              required
+            />
+            <SelectField label="Select Your Bank" value={form.bank} onChange={set("bank")} required>
               <option value="">Choose your bank</option>
-              {BANKS.map(b => <option key={b} value={b}>{b}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-[14px] font-medium text-[#1F2937] mb-2">Account Type</label>
-            <div className="flex gap-6">
-              {['Savings', 'Checking'].map(t => (
-                <label key={t} className="flex items-center gap-2 cursor-pointer text-[14px] text-[#1F2937]">
-                  <input type="radio" name="accountType" value={t} checked={form.accountType === t} onChange={set('accountType')} />
-                  {t}
-                </label>
+              {nigerianBanks.map((bank) => (
+                <option key={bank} value={bank}>
+                  {bank}
+                </option>
               ))}
+            </SelectField>
+            <div>
+              <span className="mb-2 block text-sm font-medium text-ink">Account Type</span>
+              <div className="flex gap-6">
+                {["Savings", "Checking"].map((type) => (
+                  <label key={type} className="flex items-center gap-2 text-sm text-body">
+                    <input
+                      type="radio"
+                      name="accountType"
+                      value={type}
+                      checked={form.accountType === type}
+                      onChange={set("accountType")}
+                      className="accent-primary"
+                    />
+                    {type}
+                  </label>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Step 3 */}
-          <p className="text-[12px] font-bold text-[#6B7280] uppercase tracking-wide mt-2">Step 3 — Security</p>
-          <div>
-            <label className="block text-[14px] font-medium text-[#1F2937] mb-1">Create Password</label>
-            <input type="password" value={form.password} onChange={set('password')} placeholder="••••••••" className={inputCls} required />
-            <p className="text-[12px] text-[#6B7280] mt-1">Minimum 8 characters, 1 uppercase, 1 number</p>
-          </div>
-          <div>
-            <label className="block text-[14px] font-medium text-[#1F2937] mb-1">Confirm Password</label>
-            <input type="password" value={form.confirmPassword} onChange={set('confirmPassword')} placeholder="••••••••" className={inputCls} required />
-          </div>
+            <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-subtle">Security</p>
+            <TextField
+              label="Create Password"
+              type="password"
+              value={form.password}
+              onChange={set("password")}
+              placeholder="••••••••"
+              help="Minimum 8 characters, 1 uppercase, 1 number"
+              required
+            />
+            <TextField
+              label="Confirm Password"
+              type="password"
+              value={form.confirmPassword}
+              onChange={set("confirmPassword")}
+              placeholder="••••••••"
+              required
+            />
 
-          {/* Step 4 */}
-          <p className="text-[12px] font-bold text-[#6B7280] uppercase tracking-wide mt-2">Step 4 — Verification</p>
-          <div>
-            <label className="block text-[14px] font-medium text-[#1F2937] mb-2">Verify Your Phone</label>
-            <button type="button" onClick={sendOtp} disabled={countdown > 0} className="border border-[#2563EB] text-[#2563EB] px-4 py-2 text-[14px] rounded hover:bg-[#EFF6FF] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mb-3">
-              {countdown > 0 ? `Resend in ${countdown}s` : 'Send OTP'}
-            </button>
-            {otpSent && (
-              <input value={form.otp} onChange={set('otp')} placeholder="000000" maxLength={6} className={inputCls} />
-            )}
-          </div>
+            <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-subtle">Verification</p>
+            <div>
+              <span className="mb-2 block text-sm font-medium text-ink">Verify Your Phone</span>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={sendOtp}
+                disabled={countdown > 0}
+                className="px-4 py-2"
+              >
+                {countdown > 0 ? `Resend in ${countdown}s` : "Send OTP"}
+              </Button>
+              {otpError && <p className="mt-2 text-xs text-danger">{otpError}</p>}
+              {otpSent && (
+                <TextField
+                  className="mt-3"
+                  value={form.otp}
+                  onChange={set("otp")}
+                  placeholder="000000"
+                  maxLength={6}
+                />
+              )}
+            </div>
 
-          <label className="flex items-start gap-2 cursor-pointer">
-            <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} className="mt-1" required />
-            <span className="text-[14px] text-[#6B7280]">I agree to the <a href="#" className="text-[#2563EB] hover:underline">Terms of Service</a> and <a href="#" className="text-[#2563EB] hover:underline">Privacy Policy</a></span>
-          </label>
+            <Checkbox
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              required
+              label={
+                <>
+                  I agree to the <a href="#" className="text-primary">Terms of Service</a> and{" "}
+                  <a href="#" className="text-primary">Privacy Policy</a>
+                </>
+              }
+            />
 
-          <button type="submit" disabled={submitting} className="w-full bg-[#2563EB] text-white py-3 text-[14px] font-medium rounded hover:bg-[#1D4ED8] cursor-pointer disabled:opacity-70 transition-colors">
-            {submitting ? 'Creating...' : 'Create Account'}
-          </button>
-        </form>
+            {formError && <p className="text-sm text-danger">{formError}</p>}
 
-        <p className="text-center text-[14px] text-[#6B7280] mt-5">
-          Already have an account?{' '}
-          <Link to="/login" className="text-[#2563EB] hover:underline">Sign in</Link>
-        </p>
+            <Button type="submit" disabled={submitting || !agreed} className="w-full">
+              {submitting ? "Creating…" : "Create Account"}
+            </Button>
+          </form>
+
+          <p className="mt-5 text-center text-sm text-muted">
+            Already have an account?{" "}
+            <Link to="/login" className="text-primary hover:text-primary-dark">
+              Sign in
+            </Link>
+          </p>
+        </div>
       </div>
 
-      {/* Right: Image */}
-      <div className="w-1/2 sticky top-0 h-screen">
-        <UnsplashImage query="signupRight" className="w-full h-full object-cover object-center" alt="Gig worker success" />
-        <div className="absolute bottom-[30px] right-[30px] bg-black/30 p-4 max-w-[220px]">
-          <p className="text-white text-[14px] mb-1">"I now get paid same day. Life has changed."</p>
-          <p className="text-white text-[12px]">- Chioma, Delivery Driver</p>
+      <div className="relative hidden lg:block lg:w-1/2">
+        <Photo slot="signupRight" className="h-screen" />
+        <div className="absolute bottom-8 right-8 max-w-60 bg-black/30 p-4">
+          <p className="text-sm text-white">“I now get paid same day. Life has changed.”</p>
+          <p className="mt-1 text-xs text-white/80">— Chioma, Delivery Driver</p>
         </div>
       </div>
     </div>

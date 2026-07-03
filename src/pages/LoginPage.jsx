@@ -1,74 +1,96 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import UnsplashImage from '../components/UnsplashImage';
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import Photo from "../components/Photo";
+import Button from "../components/ui/Button";
+import { TextField } from "../components/ui/Field";
+import { authService } from "../services";
+import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage() {
-  const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
-  const [showOtp, setShowOtp] = useState(false);
   const navigate = useNavigate();
+  const { completeLogin } = useAuth();
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!showOtp) { setShowOtp(true); return; }
-    navigate('/dashboard');
+  const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
+  const [step, setStep] = useState("phone");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError("");
+    setSubmitting(true);
+    try {
+      if (step === "phone") {
+        await authService.requestOtp(phone);
+        setStep("otp");
+      } else {
+        await completeLogin(phone, otp);
+        navigate("/app/dashboard");
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div className="flex h-screen">
-      {/* Left: Form */}
-      <div className="w-1/2 bg-white p-[60px] flex flex-col justify-center overflow-y-auto">
-        <Link to="/" className="text-[24px] font-bold text-[#2563EB] mb-10 block">SwiftSettle</Link>
-        <h1 className="text-[32px] font-bold text-[#1F2937] mt-10 mb-2">Welcome Back</h1>
-        <p className="text-[16px] text-[#6B7280] mb-10">Sign in to your account</p>
+    <div className="flex min-h-screen flex-col lg:flex-row">
+      <div className="flex w-full flex-col justify-center px-6 py-16 sm:px-10 lg:w-1/2 lg:px-16">
+        <div className="mx-auto w-full max-w-sm">
+          <Link to="/" className="text-xl font-bold text-primary">
+            SwiftSettle
+          </Link>
+          <h1 className="mt-10 text-3xl font-bold text-ink">Welcome Back</h1>
+          <p className="mb-10 mt-2 text-base text-muted">Sign in to your account</p>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          <div>
-            <label className="block text-[14px] font-medium text-[#1F2937] mb-1">Phone Number</label>
-            <input
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+            <TextField
+              label="Phone Number"
               type="tel"
               value={phone}
-              onChange={e => setPhone(e.target.value)}
+              onChange={(e) => setPhone(e.target.value)}
               placeholder="+234 (0) 800 000 0000"
-              className="w-full border border-[#D1D5DB] px-4 py-3 text-[14px] rounded focus:outline-none focus:border-[#2563EB]"
+              help="We'll send you an OTP to verify"
+              disabled={step === "otp"}
               required
             />
-            <p className="text-[12px] text-[#6B7280] mt-1">We'll send you an OTP to verify</p>
-          </div>
 
-          {showOtp && (
-            <div>
-              <label className="block text-[14px] font-medium text-[#1F2937] mb-1">Enter OTP</label>
-              <input
-                type="text"
+            {step === "otp" && (
+              <TextField
+                label="Enter OTP"
                 value={otp}
-                onChange={e => setOtp(e.target.value)}
+                onChange={(e) => setOtp(e.target.value)}
                 placeholder="000000"
                 maxLength={6}
-                className="w-full border border-[#D1D5DB] px-4 py-3 text-[14px] rounded focus:outline-none focus:border-[#2563EB]"
+                help="Check your phone or email"
+                autoFocus
                 required
               />
-              <p className="text-[12px] text-[#6B7280] mt-1">Check your phone or email</p>
-            </div>
-          )}
+            )}
 
-          <button type="submit" className="w-full bg-[#2563EB] text-white py-3 text-[14px] font-medium rounded hover:bg-[#1D4ED8] cursor-pointer transition-colors">
-            {showOtp ? 'Sign In' : 'Send OTP'}
-          </button>
-        </form>
+            {error && <p className="text-sm text-danger">{error}</p>}
 
-        <p className="text-center text-[14px] text-[#6B7280] mt-5">
-          Don't have an account?{' '}
-          <Link to="/signup" className="text-[#2563EB] hover:underline">Sign up</Link>
-        </p>
+            <Button type="submit" disabled={submitting} className="w-full">
+              {submitting ? "Please wait…" : step === "phone" ? "Send OTP" : "Sign In"}
+            </Button>
+          </form>
+
+          <p className="mt-5 text-center text-sm text-muted">
+            Don't have an account?{" "}
+            <Link to="/signup" className="text-primary hover:text-primary-dark">
+              Sign up
+            </Link>
+          </p>
+        </div>
       </div>
 
-      {/* Right: Image */}
-      <div className="w-1/2 relative">
-        <UnsplashImage query="loginRight" className="w-full h-full object-cover object-center" alt="Happy delivery worker" />
-        <div className="absolute bottom-[30px] right-[30px] bg-black/30 p-4 max-w-[220px]">
-          <p className="text-white text-[14px] mb-1">"I now get paid same day. Life has changed."</p>
-          <p className="text-white text-[12px]">- Chioma, Delivery Driver</p>
+      <div className="relative w-full lg:w-1/2">
+        <Photo slot="loginRight" className="h-64 lg:h-screen" />
+        <div className="absolute bottom-8 right-8 max-w-60 bg-black/30 p-4">
+          <p className="text-sm text-white">“I now get paid same day. Life has changed.”</p>
+          <p className="mt-1 text-xs text-white/80">— Chioma, Delivery Driver</p>
         </div>
       </div>
     </div>
