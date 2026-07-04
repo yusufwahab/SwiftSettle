@@ -11,6 +11,7 @@ import { earningsService as mockEarningsService } from "./mock/earningsService";
 import { settlementsService as mockSettlementsService } from "./mock/settlementsService";
 import { supportService as mockSupportService } from "./mock/supportService";
 import { preferencesService as mockPreferencesService } from "./mock/preferencesService";
+import { notificationsService as mockNotificationsService } from "./mock/notificationsService";
 
 const registry = {
   mock: {
@@ -20,6 +21,7 @@ const registry = {
     settlementsService: mockSettlementsService,
     supportService: mockSupportService,
     preferencesService: mockPreferencesService,
+    notificationsService: mockNotificationsService,
   },
   // live: { authService: liveAuthService, ... } — added when Nomba is wired up.
 };
@@ -32,3 +34,4 @@ export const earningsService = active.earningsService;
 export const settlementsService = active.settlementsService;
 export const supportService = active.supportService;
 export const preferencesService = active.preferencesService;
+export const notificationsService = active.notificationsService;

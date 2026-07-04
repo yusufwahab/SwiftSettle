@@ -21,6 +21,20 @@
   --color-danger: #b42318;
   --color-warning: #b54708;
 
+  /* Dark app-shell theme — used inside the authenticated product only.
+     Marketing/auth pages stay on the light tokens above. */
+  --color-appbg: #0a0d12;
+  --color-panel: #12161d;
+  --color-panel-soft: #181d26;
+  --color-text-1: #f2f4f7;
+  --color-text-2: #98a2b3;
+  --color-text-3: #626b78;
+  --color-accent: #3b82f6;
+  --color-accent-dark: #2563eb;
+  --color-accent-2: #22c55e;
+  --color-danger-vivid: #f87171;
+  --color-warning-vivid: #fbbf24;
+
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 

@@ -1,11 +1,12 @@
 import { useState } from "react";
+import { ShieldAlert } from "lucide-react";
 import AppLayout from "../components/layout/AppLayout";
 import Card from "../components/ui/Card";
-import Button from "../components/ui/Button";
-import Modal from "../components/ui/Modal";
-import Skeleton from "../components/ui/Skeleton";
-import { ErrorState } from "../components/ui/States";
-import { TextField, Toggle, Checkbox } from "../components/ui/Field";
+import Button from "../components/ui/dark/Button";
+import Modal from "../components/ui/dark/Modal";
+import Skeleton from "../components/ui/dark/Skeleton";
+import { ErrorState } from "../components/ui/dark/States";
+import { TextField, Toggle, Checkbox } from "../components/ui/dark/Field";
 import { useAuth } from "../context/AuthContext";
 import { preferencesService } from "../services";
 import { useAsync } from "../hooks/useAsync";
@@ -28,14 +29,14 @@ export default function SettingsPage() {
   };
 
   return (
-    <AppLayout title="Settings" subtitle="Manage your account and preferences">
+    <AppLayout title="Settings" breadcrumb="Settings" subtitle="Manage your account and preferences">
       <Card className="mb-6">
         <div className="mb-4 flex items-center justify-between">
-          <p className="text-sm font-bold text-ink">Personal Information</p>
+          <p className="text-sm font-bold text-text-1">Personal Information</p>
           <button
             type="button"
             onClick={() => setEditingPersonal((v) => !v)}
-            className="text-sm text-primary hover:text-primary-dark"
+            className="text-sm text-accent hover:text-accent-dark"
           >
             {editingPersonal ? "Cancel" : "Edit"}
           </button>
@@ -47,12 +48,12 @@ export default function SettingsPage() {
           { label: "Phone", value: worker?.phone },
           { label: "Date of Birth", value: worker?.dateOfBirth },
         ].map(({ label, value }) => (
-          <div key={label} className="flex items-center justify-between border-b border-border py-3 last:border-0">
-            <span className="w-32 text-xs text-muted">{label}</span>
+          <div key={label} className="flex items-center justify-between border-b border-white/6 py-3 last:border-0">
+            <span className="w-32 text-xs text-text-3">{label}</span>
             {editingPersonal ? (
               <TextField defaultValue={value} className="flex-1" />
             ) : (
-              <span className="text-sm text-ink">{value}</span>
+              <span className="text-sm text-text-1">{value}</span>
             )}
           </div>
         ))}
@@ -62,21 +63,21 @@ export default function SettingsPage() {
           </Button>
         )}
 
-        <p className="mb-4 mt-8 text-sm font-bold text-ink">Bank Details</p>
+        <p className="mb-4 mt-8 text-sm font-bold text-text-1">Bank Details</p>
         {[
           { label: "Bank Name", value: worker?.bank.name },
           { label: "Account Number", value: worker?.bank.accountNumberMasked },
           { label: "Account Holder", value: worker?.bank.accountHolder },
         ].map(({ label, value }) => (
-          <div key={label} className="flex items-center justify-between border-b border-border py-3 last:border-0">
-            <span className="w-32 text-xs text-muted">{label}</span>
-            <span className="text-sm text-ink">{value}</span>
+          <div key={label} className="flex items-center justify-between border-b border-white/6 py-3 last:border-0">
+            <span className="w-32 text-xs text-text-3">{label}</span>
+            <span className="text-sm text-text-1">{value}</span>
           </div>
         ))}
       </Card>
 
       <Card className="mb-6">
-        <p className="mb-4 text-sm font-bold text-ink">Change Password</p>
+        <p className="mb-4 text-sm font-bold text-text-1">Change Password</p>
         <div className="mb-6 flex flex-col gap-4">
           <TextField label="Current Password" type="password" placeholder="••••••••" />
           <TextField label="New Password" type="password" placeholder="••••••••" />
@@ -84,7 +85,7 @@ export default function SettingsPage() {
           <Button className="w-full">Update Password</Button>
         </div>
 
-        <div className="border-t border-border pt-4">
+        <div className="border-t border-white/6 pt-4">
           <Toggle
             checked={twoFA}
             onChange={setTwoFA}
@@ -104,7 +105,7 @@ export default function SettingsPage() {
       </Card>
 
       <Card className="mb-6">
-        <p className="mb-2 text-sm font-bold text-ink">Notifications</p>
+        <p className="mb-2 text-sm font-bold text-text-1">Notifications</p>
         {prefsState.status === "loading" && (
           <div className="space-y-3 py-3">
             <Skeleton className="h-5" />
@@ -117,18 +118,18 @@ export default function SettingsPage() {
         )}
         {active && (
           <>
-            <p className="mb-1 mt-4 text-xs font-semibold uppercase tracking-wide text-subtle">Email</p>
+            <p className="mb-1 mt-4 text-xs font-semibold uppercase tracking-wide text-text-3">Email</p>
             <Toggle checked={active.settlements} onChange={setPref("settlements")} label="Settlement Confirmations" />
             <Toggle checked={active.weekly} onChange={setPref("weekly")} label="Weekly Earnings Summary" />
             <Toggle checked={active.security} onChange={setPref("security")} label="Security Alerts" />
             <Toggle checked={active.marketing} onChange={setPref("marketing")} label="Marketing & Promotions" />
 
-            <p className="mb-1 mt-5 text-xs font-semibold uppercase tracking-wide text-subtle">Push</p>
+            <p className="mb-1 mt-5 text-xs font-semibold uppercase tracking-wide text-text-3">Push</p>
             <Toggle checked={active.orders} onChange={setPref("orders")} label="Order Updates" />
             <Toggle checked={active.settlementAlerts} onChange={setPref("settlementAlerts")} label="Settlement Alerts" />
             <Toggle checked={active.activity} onChange={setPref("activity")} label="Account Activity" />
 
-            <p className="mb-1 mt-5 text-xs font-semibold uppercase tracking-wide text-subtle">SMS</p>
+            <p className="mb-1 mt-5 text-xs font-semibold uppercase tracking-wide text-text-3">SMS</p>
             <Toggle
               checked={active.sms}
               onChange={setPref("sms")}
@@ -139,9 +140,12 @@ export default function SettingsPage() {
         )}
       </Card>
 
-      <Card className="border-danger/40">
-        <p className="mb-2 text-sm font-bold text-ink">Delete Account</p>
-        <p className="mb-4 text-sm text-muted">
+      <Card className="border-danger-vivid/30">
+        <div className="mb-2 flex items-center gap-2">
+          <ShieldAlert className="h-4 w-4 text-danger-vivid" strokeWidth={1.75} />
+          <p className="text-sm font-bold text-text-1">Delete Account</p>
+        </div>
+        <p className="mb-4 text-sm text-text-3">
           Once you delete your account, there is no going back. Please be certain.
         </p>
         <Button variant="danger" onClick={() => setDeleteOpen(true)} className="px-6 py-2.5">
@@ -150,8 +154,8 @@ export default function SettingsPage() {
       </Card>
 
       <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)} width="440px">
-        <h2 className="text-xl font-bold text-ink">Are you sure?</h2>
-        <p className="mt-3 text-sm text-muted">
+        <h2 className="text-xl font-bold text-text-1">Are you sure?</h2>
+        <p className="mt-3 text-sm text-text-3">
           Deleting your account will remove all your data. This cannot be undone.
         </p>
         <Checkbox

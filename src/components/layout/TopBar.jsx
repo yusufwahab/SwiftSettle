@@ -1,17 +1,13 @@
 import { useEffect, useState } from "react";
+import { Home, ChevronRight, Bell, RefreshCw, Menu } from "lucide-react";
 
 function format(date) {
-  const datePart = date.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+  const datePart = date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   const timePart = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  return `${datePart} | ${timePart}`;
+  return `${datePart} · ${timePart}`;
 }
 
-export default function TopBar({ title, subtitle, onMenuClick }) {
+export default function TopBar({ title, breadcrumb, subtitle, onMenuClick }) {
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -20,22 +16,47 @@ export default function TopBar({ title, subtitle, onMenuClick }) {
   }, []);
 
   return (
-    <div className="mb-8 flex items-start justify-between gap-4">
-      <div className="flex items-start gap-3">
-        <button
-          type="button"
-          onClick={onMenuClick}
-          className="mt-1 block rounded border border-border-strong px-2.5 py-1.5 text-sm text-ink lg:hidden"
-          aria-label="Open menu"
-        >
-          Menu
-        </button>
-        <div>
-          <h1 className="text-2xl font-bold text-ink lg:text-[28px]">{title}</h1>
-          {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
+    <div className="mb-6">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-xs text-text-3">
+          <button
+            type="button"
+            onClick={onMenuClick}
+            className="mr-2 rounded-lg border border-white/8 p-1.5 text-text-2 lg:hidden"
+            aria-label="Open menu"
+          >
+            <Menu className="h-4 w-4" strokeWidth={1.75} />
+          </button>
+          <Home className="h-3.5 w-3.5" strokeWidth={1.75} />
+          <span>App</span>
+          <ChevronRight className="h-3.5 w-3.5" strokeWidth={1.75} />
+          <span className="text-text-2">{breadcrumb || title}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="hidden text-xs text-text-3 sm:inline">{format(now)}</span>
+          <IconButton icon={RefreshCw} label="Refresh" />
+          <IconButton icon={Bell} label="Notifications" dot />
         </div>
       </div>
-      <p className="hidden shrink-0 pt-1 text-sm text-muted sm:block">{format(now)}</p>
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-text-1">{title}</h1>
+          {subtitle && <p className="mt-1 text-sm text-text-3">{subtitle}</p>}
+        </div>
+      </div>
     </div>
+  );
+}
+
+function IconButton({ icon: Icon, label, dot = false }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      className="relative rounded-lg border border-white/8 p-2 text-text-2 hover:bg-white/5 hover:text-text-1"
+    >
+      <Icon className="h-4 w-4" strokeWidth={1.75} />
+      {dot && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-accent-2" />}
+    </button>
   );
 }

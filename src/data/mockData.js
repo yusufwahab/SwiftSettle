@@ -43,6 +43,13 @@ export const balanceSummary = {
   weekDays: 7,
 };
 
+export const notifications = [
+  { id: "n1", type: "success", text: "Settlement of ₦5,000 completed", time: "2 hours ago" },
+  { id: "n2", type: "info", text: "Weekly earnings summary is ready", time: "Yesterday" },
+  { id: "n3", type: "primary", text: "New device signed in to your account", time: "2 days ago" },
+  { id: "n4", type: "warning", text: "Settlement SW-2026-001214 is pending", time: "3 days ago" },
+];
+
 export const todayActivity = [
   { id: "act_1", label: "Delivery completed", time: "2:15 PM", amount: 1250 },
   { id: "act_2", label: "Delivery completed", time: "1:42 PM", amount: 950 },

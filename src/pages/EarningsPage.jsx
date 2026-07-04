@@ -1,14 +1,23 @@
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
+import { Star } from "lucide-react";
 import AppLayout from "../components/layout/AppLayout";
 import Card from "../components/ui/Card";
-import Skeleton from "../components/ui/Skeleton";
-import { ErrorState } from "../components/ui/States";
+import Skeleton from "../components/ui/dark/Skeleton";
+import { ErrorState } from "../components/ui/dark/States";
 import { formatNaira } from "../lib/format";
 import { chartColors } from "../lib/chartTheme";
 import { earningsService } from "../services";
 import { useAsync } from "../hooks/useAsync";
+
+const tooltipStyle = {
+  background: "#181d26",
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 10,
+  color: "#f2f4f7",
+  fontSize: 13,
+};
 
 export default function EarningsPage() {
   const weeklyState = useAsync(() => earningsService.getWeekly(), []);
@@ -17,38 +26,38 @@ export default function EarningsPage() {
   const performanceState = useAsync(() => earningsService.getPerformance(), []);
 
   return (
-    <AppLayout title="Earnings" subtitle="Track your income and performance">
-      <Card className="mb-6">
-        <p className="mb-4 text-sm font-bold text-ink">Weekly Earnings</p>
+    <AppLayout title="Earnings" breadcrumb="Earnings" subtitle="Track your income and performance">
+      <Card className="mb-5">
+        <p className="mb-4 text-sm font-bold text-text-1">Weekly Earnings</p>
         <ChartFrame state={weeklyState} height={260}>
           {(data) => (
             <ResponsiveContainer width="100%" height={260}>
               <AreaChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartColors.border} />
-                <XAxis dataKey="day" tick={{ fontSize: 12, fill: chartColors.muted }} axisLine={false} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartColors.gridDark} />
+                <XAxis dataKey="day" tick={{ fontSize: 12, fill: chartColors.mutedDark }} axisLine={false} tickLine={false} />
                 <YAxis
-                  tick={{ fontSize: 12, fill: chartColors.muted }}
+                  tick={{ fontSize: 12, fill: chartColors.mutedDark }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(v) => `₦${(v / 1000).toFixed(0)}k`}
                 />
-                <Tooltip formatter={(v) => [formatNaira(v), "Earnings"]} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [formatNaira(v), "Earnings"]} />
                 <Area
                   type="monotone"
                   dataKey="amount"
-                  stroke={chartColors.primary}
+                  stroke={chartColors.accent}
                   strokeWidth={2}
-                  fill={chartColors.primary}
-                  fillOpacity={0.08}
+                  fill={chartColors.accent}
+                  fillOpacity={0.15}
                 />
               </AreaChart>
             </ResponsiveContainer>
           )}
         </ChartFrame>
-        <p className="mt-2 text-center text-xs text-muted">Daily Earnings</p>
+        <p className="mt-2 text-center text-xs text-text-3">Daily Earnings</p>
       </Card>
 
-      <div className="mb-6 grid gap-5 sm:grid-cols-3">
+      <div className="mb-5 grid gap-5 sm:grid-cols-3">
         <StatCard
           loading={statsState.status === "loading"}
           label="Average Daily Earnings"
@@ -70,22 +79,22 @@ export default function EarningsPage() {
         />
       </div>
 
-      <Card className="mb-6">
-        <p className="mb-4 text-sm font-bold text-ink">Monthly Breakdown</p>
+      <Card className="mb-5">
+        <p className="mb-4 text-sm font-bold text-text-1">Monthly Breakdown</p>
         <ChartFrame state={monthlyState} height={220}>
           {(data) => (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartColors.border} />
-                <XAxis dataKey="month" tick={{ fontSize: 12, fill: chartColors.muted }} axisLine={false} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartColors.gridDark} />
+                <XAxis dataKey="month" tick={{ fontSize: 12, fill: chartColors.mutedDark }} axisLine={false} tickLine={false} />
                 <YAxis
-                  tick={{ fontSize: 12, fill: chartColors.muted }}
+                  tick={{ fontSize: 12, fill: chartColors.mutedDark }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(v) => `₦${(v / 1000).toFixed(0)}k`}
                 />
-                <Tooltip formatter={(v) => [formatNaira(v), "Earnings"]} />
-                <Bar dataKey="amount" fill={chartColors.primary} radius={[2, 2, 0, 0]} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [formatNaira(v), "Earnings"]} />
+                <Bar dataKey="amount" fill={chartColors.accent2} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -93,7 +102,7 @@ export default function EarningsPage() {
       </Card>
 
       <Card>
-        <p className="mb-6 text-sm font-bold text-ink">Performance Metrics</p>
+        <p className="mb-6 text-sm font-bold text-text-1">Performance Metrics</p>
         {performanceState.status === "loading" && (
           <div className="grid gap-8 sm:grid-cols-3">
             <Skeleton className="h-16" />
@@ -113,18 +122,21 @@ export default function EarningsPage() {
             />
             <div>
               <div className="mb-1 flex items-baseline justify-between">
-                <span className="text-sm text-ink">Customer Rating</span>
-                <span className="text-sm font-bold text-primary">
+                <span className="flex items-center gap-1.5 text-sm text-text-1">
+                  <Star className="h-3.5 w-3.5 text-accent" strokeWidth={1.75} fill="currentColor" />
+                  Customer Rating
+                </span>
+                <span className="text-sm font-bold text-accent">
                   {performanceState.data.rating} / 5
                 </span>
               </div>
-              <div className="h-2 w-full rounded-full bg-border">
+              <div className="h-2 w-full rounded-full bg-white/8">
                 <div
-                  className="h-2 rounded-full bg-primary"
+                  className="h-2 rounded-full bg-accent"
                   style={{ width: `${(performanceState.data.rating / 5) * 100}%` }}
                 />
               </div>
-              <p className="mt-1 text-xs text-muted">
+              <p className="mt-1 text-xs text-text-3">
                 Based on {performanceState.data.ratingCount} ratings
               </p>
             </div>
@@ -151,19 +163,19 @@ function ChartFrame({ state, height, children }) {
 function StatCard({ label, value, lines = [], loading, highlight }) {
   return (
     <Card>
-      <p className="text-xs text-muted">{label}</p>
+      <p className="text-xs text-text-3">{label}</p>
       {loading ? (
         <Skeleton className="mt-2 h-7 w-24" />
       ) : (
-        <p className="mt-1.5 text-2xl font-bold text-ink">{value}</p>
+        <p className="mt-1.5 text-2xl font-bold text-text-1">{value}</p>
       )}
       {!loading &&
         lines.map((line) => (
-          <p key={line} className="mt-1 text-xs text-muted">
+          <p key={line} className="mt-1 text-xs text-text-3">
             {line}
           </p>
         ))}
-      {!loading && highlight && <p className="mt-1 text-xs text-success">{highlight}</p>}
+      {!loading && highlight && <p className="mt-1 text-xs text-accent-2">{highlight}</p>}
     </Card>
   );
 }
@@ -172,13 +184,13 @@ function ProgressMetric({ pct, label, subtext }) {
   return (
     <div>
       <div className="mb-1 flex items-baseline justify-between">
-        <span className="text-sm text-ink">{label}</span>
-        <span className="text-sm font-bold text-primary">{pct}%</span>
+        <span className="text-sm text-text-1">{label}</span>
+        <span className="text-sm font-bold text-accent">{pct}%</span>
       </div>
-      <div className="h-2 w-full rounded-full bg-border">
-        <div className="h-2 rounded-full bg-primary" style={{ width: `${pct}%` }} />
+      <div className="h-2 w-full rounded-full bg-white/8">
+        <div className="h-2 rounded-full bg-accent" style={{ width: `${pct}%` }} />
       </div>
-      <p className="mt-1 text-xs text-muted">{subtext}</p>
+      <p className="mt-1 text-xs text-text-3">{subtext}</p>
     </div>
   );
 }

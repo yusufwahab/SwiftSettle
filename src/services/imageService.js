@@ -18,6 +18,7 @@ const slots = {
   step4: { id: "1513595207829-9f414c0665f6", alt: "Phone displaying a push notification" },
   loginRight: { id: "1551825687-f9de1603ed8b", alt: "Smiling delivery worker" },
   signupRight: { id: "1659353741198-cf4a0a75bc44", alt: "Gig worker celebrating after a successful shift" },
+  workerAvatar: { id: "1618298363483-e31a31f1a1e2", alt: "Chioma Adeyemi" },
 };
 
 export function getImage(slot, { width = 900 } = {}) {

@@ -3,14 +3,14 @@ import { currentWorker } from "../../data/mockData";
 
 export const authService = {
   async requestOtp(phone) {
-    if (!phone || phone.replace(/\D/g, "").length < 10) {
-      throw new Error("Enter a valid phone number.");
+    if (!phone) {
+      throw new Error("Enter a phone number.");
     }
     return simulate({ sent: true, phone }, { delay: 700 });
   },
 
   async verifyOtp(phone, otp) {
-    if (!otp || otp.length < 4) {
+    if (!otp) {
       throw new Error("Enter the code we sent you.");
     }
     return simulate({ worker: currentWorker, token: "mock_session_token" }, { delay: 700 });
