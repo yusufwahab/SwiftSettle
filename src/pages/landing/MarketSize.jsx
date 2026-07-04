@@ -6,15 +6,15 @@ const metrics = [
 
 export default function MarketSize() {
   return (
-    <section className="px-6 py-20 sm:px-10 lg:px-16">
+    <section className="relative z-10 px-6 py-20 sm:px-10 lg:px-16">
       <div className="mx-auto max-w-6xl text-center">
-        <h2 className="text-3xl font-bold text-ink">The Opportunity</h2>
+        <h2 className="text-3xl font-bold text-text-1">The Opportunity</h2>
         <div className="mt-14 grid gap-10 sm:grid-cols-3">
           {metrics.map((metric) => (
             <div key={metric.number}>
-              <p className="text-5xl font-bold text-primary">{metric.number}</p>
-              <p className="mt-3 text-base text-ink">{metric.description}</p>
-              <p className="mt-2 text-sm text-muted">{metric.subtext}</p>
+              <p className="text-5xl font-bold text-accent">{metric.number}</p>
+              <p className="mt-3 text-base text-text-1">{metric.description}</p>
+              <p className="mt-2 text-sm text-text-3">{metric.subtext}</p>
             </div>
           ))}
         </div>

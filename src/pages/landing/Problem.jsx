@@ -18,22 +18,19 @@ const stats = [
 
 export default function Problem() {
   return (
-    <section className="px-6 py-20 sm:px-10 lg:px-16">
+    <section className="relative z-10 px-6 py-20 sm:px-10 lg:px-16">
       <div className="mx-auto max-w-6xl text-center">
-        <h2 className="text-3xl font-bold text-ink">The Problem is Real</h2>
-        <p className="mt-3 text-base text-muted">
+        <h2 className="text-3xl font-bold text-text-1">The Problem is Real</h2>
+        <p className="mt-3 text-base text-text-2">
           15 million Nigerian gig workers face the same barrier every day
         </p>
 
         <div className="mt-12 grid gap-6 sm:grid-cols-3">
           {stats.map((stat) => (
-            <div
-              key={stat.label}
-              className="bg-surface-alt p-8 text-left shadow-[0_4px_6px_rgba(0,0,0,0.07)]"
-            >
-              <p className="text-4xl font-bold text-primary">{stat.number}</p>
-              <p className="mt-3 text-sm font-medium text-ink">{stat.label}</p>
-              <p className="mt-2 text-sm text-muted">{stat.description}</p>
+            <div key={stat.label} className="rounded-2xl bg-panel p-8 text-left">
+              <p className="text-4xl font-bold text-accent">{stat.number}</p>
+              <p className="mt-3 text-sm font-medium text-text-1">{stat.label}</p>
+              <p className="mt-2 text-sm text-text-3">{stat.description}</p>
             </div>
           ))}
         </div>

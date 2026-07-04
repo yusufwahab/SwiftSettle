@@ -11,7 +11,15 @@ import Footer from "./landing/Footer";
 
 export default function LandingPage() {
   return (
-    <div>
+    <div className="relative overflow-hidden bg-appbg">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -left-40 -top-40 h-[480px] w-[480px] rounded-full bg-accent/20 blur-[130px]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-32 top-[900px] h-[420px] w-[420px] rounded-full bg-accent-2/12 blur-[130px]"
+      />
       <LandingNav />
       <Hero />
       <Problem />

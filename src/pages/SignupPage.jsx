@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Photo from "../components/Photo";
-import Button from "../components/ui/Button";
-import { TextField, SelectField, Checkbox } from "../components/ui/Field";
+import Button from "../components/ui/dark/Button";
+import { TextField, SelectField, Checkbox } from "../components/ui/dark/Field";
 import { nigerianBanks } from "../data/mockData";
 import { authService } from "../services";
 import { useAuth } from "../context/AuthContext";
@@ -75,17 +75,21 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col lg:flex-row">
-      <div className="w-full px-6 py-16 sm:px-10 lg:w-1/2 lg:px-16">
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-appbg lg:flex-row">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -left-40 -top-40 h-[420px] w-[420px] rounded-full bg-accent/20 blur-[130px]"
+      />
+      <div className="relative z-10 w-full px-6 py-16 sm:px-10 lg:w-1/2 lg:px-16">
         <div className="mx-auto max-w-sm">
-          <Link to="/" className="text-xl font-bold text-primary">
+          <Link to="/" className="text-xl font-bold text-text-1">
             SwiftSettle
           </Link>
-          <h1 className="mt-8 text-3xl font-bold text-ink">Get Started</h1>
-          <p className="mb-8 mt-2 text-base text-muted">Create your SwiftSettle account in 2 minutes</p>
+          <h1 className="mt-8 text-3xl font-bold text-text-1">Get Started</h1>
+          <p className="mb-8 mt-2 text-base text-text-3">Create your SwiftSettle account in 2 minutes</p>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-subtle">
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-3">
               Personal information
             </p>
             <TextField label="Full Name" value={form.fullName} onChange={set("fullName")} placeholder="Chioma Adeyemi" required />
@@ -93,7 +97,7 @@ export default function SignupPage() {
             <TextField label="Phone Number" type="tel" value={form.phone} onChange={set("phone")} placeholder="+234 (0) 800 000 0000" required />
             <TextField label="Date of Birth" value={form.dob} onChange={set("dob")} placeholder="DD/MM/YYYY" required />
 
-            <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-subtle">Bank details</p>
+            <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-text-3">Bank details</p>
             <TextField
               label="Bank Account Number"
               value={form.accountNumber}
@@ -111,17 +115,17 @@ export default function SignupPage() {
               ))}
             </SelectField>
             <div>
-              <span className="mb-2 block text-sm font-medium text-ink">Account Type</span>
+              <span className="mb-2 block text-sm font-medium text-text-1">Account Type</span>
               <div className="flex gap-6">
                 {["Savings", "Checking"].map((type) => (
-                  <label key={type} className="flex items-center gap-2 text-sm text-body">
+                  <label key={type} className="flex items-center gap-2 text-sm text-text-2">
                     <input
                       type="radio"
                       name="accountType"
                       value={type}
                       checked={form.accountType === type}
                       onChange={set("accountType")}
-                      className="accent-primary"
+                      className="accent-accent"
                     />
                     {type}
                   </label>
@@ -129,7 +133,7 @@ export default function SignupPage() {
               </div>
             </div>
 
-            <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-subtle">Security</p>
+            <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-text-3">Security</p>
             <TextField
               label="Create Password"
               type="password"
@@ -148,9 +152,9 @@ export default function SignupPage() {
               required
             />
 
-            <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-subtle">Verification</p>
+            <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-text-3">Verification</p>
             <div>
-              <span className="mb-2 block text-sm font-medium text-ink">Verify Your Phone</span>
+              <span className="mb-2 block text-sm font-medium text-text-1">Verify Your Phone</span>
               <Button
                 type="button"
                 variant="outline"
@@ -160,7 +164,7 @@ export default function SignupPage() {
               >
                 {countdown > 0 ? `Resend in ${countdown}s` : "Send OTP"}
               </Button>
-              {otpError && <p className="mt-2 text-xs text-danger">{otpError}</p>}
+              {otpError && <p className="mt-2 text-xs text-danger-vivid">{otpError}</p>}
               {otpSent && (
                 <TextField
                   className="mt-3"
@@ -178,29 +182,29 @@ export default function SignupPage() {
               required
               label={
                 <>
-                  I agree to the <a href="#" className="text-primary">Terms of Service</a> and{" "}
-                  <a href="#" className="text-primary">Privacy Policy</a>
+                  I agree to the <a href="#" className="text-accent">Terms of Service</a> and{" "}
+                  <a href="#" className="text-accent">Privacy Policy</a>
                 </>
               }
             />
 
-            {formError && <p className="text-sm text-danger">{formError}</p>}
+            {formError && <p className="text-sm text-danger-vivid">{formError}</p>}
 
             <Button type="submit" disabled={submitting || !agreed} className="w-full">
               {submitting ? "Creating…" : "Create Account"}
             </Button>
           </form>
 
-          <p className="mt-5 text-center text-sm text-muted">
+          <p className="mt-5 text-center text-sm text-text-3">
             Already have an account?{" "}
-            <Link to="/login" className="text-primary hover:text-primary-dark">
+            <Link to="/login" className="text-accent hover:text-accent-dark">
               Sign in
             </Link>
           </p>
         </div>
       </div>
 
-      <div className="relative hidden lg:block lg:w-1/2">
+      <div className="relative z-10 hidden lg:block lg:w-1/2">
         <Photo slot="signupRight" className="h-screen" />
         <div className="absolute bottom-8 right-8 max-w-60 bg-black/30 p-4">
           <p className="text-sm text-white">“I now get paid same day. Life has changed.”</p>
