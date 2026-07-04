@@ -3,8 +3,8 @@ export function TextField({ label, help, error, className = "", ...props }) {
     <label className={`block ${className}`}>
       {label && <span className="mb-1.5 block text-sm font-medium text-text-1">{label}</span>}
       <input
-        className={`w-full rounded-xl border bg-white/5 px-4 py-3 text-sm text-text-1 placeholder:text-text-3 focus:outline-none focus:border-accent ${
-          error ? "border-danger-vivid" : "border-white/10"
+        className={`w-full rounded-xl bg-white/5 px-4 py-3 text-sm text-text-1 placeholder:text-text-3 focus:outline-none ${
+          error ? "border border-danger-vivid" : ""
         }`}
         {...props}
       />
@@ -22,8 +22,8 @@ export function SelectField({ label, help, error, children, className = "", ...p
     <label className={`block ${className}`}>
       {label && <span className="mb-1.5 block text-sm font-medium text-text-1">{label}</span>}
       <select
-        className={`w-full rounded-xl border bg-panel px-4 py-3 text-sm text-text-1 focus:outline-none focus:border-accent ${
-          error ? "border-danger-vivid" : "border-white/10"
+        className={`w-full rounded-xl bg-white/5 px-4 py-3 text-sm text-text-1 focus:outline-none ${
+          error ? "border border-danger-vivid" : ""
         }`}
         {...props}
       >

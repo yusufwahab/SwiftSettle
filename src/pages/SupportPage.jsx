@@ -40,7 +40,7 @@ export default function SupportPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search for answers... (e.g., 'How do I settle my earnings?')"
-            className="w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-11 pr-4 text-sm text-text-1 focus:outline-none focus:border-accent"
+            className="w-full rounded-xl bg-white/5 py-3 pl-11 pr-4 text-sm text-text-1 focus:outline-none"
           />
         </div>
         {query.trim() && (

@@ -27,7 +27,7 @@ export default function SettlementsPage() {
             type="text"
             defaultValue="Last 30 days"
             readOnly
-            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-text-1"
+            className="rounded-xl bg-white/5 px-3 py-2.5 text-sm text-text-1"
           />
         </div>
         <div>
@@ -35,7 +35,7 @@ export default function SettlementsPage() {
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="rounded-xl border border-white/10 bg-panel px-3 py-2.5 text-sm text-text-1"
+            className="rounded-xl bg-white/5 px-3 py-2.5 text-sm text-text-1"
           >
             {statusOptions.map((s) => (
               <option key={s}>{s}</option>

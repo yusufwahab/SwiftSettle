@@ -22,7 +22,7 @@ export default function TopBar({ title, breadcrumb, subtitle, onMenuClick }) {
           <button
             type="button"
             onClick={onMenuClick}
-            className="mr-2 rounded-lg border border-white/8 p-1.5 text-text-2 lg:hidden"
+            className="mr-2 rounded-lg bg-white/5 p-1.5 text-text-2 lg:hidden"
             aria-label="Open menu"
           >
             <Menu className="h-4 w-4" strokeWidth={1.75} />
@@ -53,7 +53,7 @@ function IconButton({ icon: Icon, label, dot = false }) {
     <button
       type="button"
       aria-label={label}
-      className="relative rounded-lg border border-white/8 p-2 text-text-2 hover:bg-white/5 hover:text-text-1"
+      className="relative rounded-lg bg-white/5 p-2 text-text-2 hover:bg-white/10 hover:text-text-1"
     >
       <Icon className="h-4 w-4" strokeWidth={1.75} />
       {dot && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-accent-2" />}
