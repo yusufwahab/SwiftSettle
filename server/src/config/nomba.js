@@ -4,12 +4,12 @@ const logger = require("../utils/logger");
 
 // Verified against developer.nomba.com (2026-07-06):
 //   POST {base}/v1/auth/token/issue
-//   headers: accountId (PARENT account), Content-Type: application/json
+//   headers: accountId (main/parent account), Content-Type: application/json
 //   body: { grant_type: 'client_credentials', client_id, client_secret }
 //   response: { data: { access_token, refresh_token, expiresAt (ISO string) } }
 //
-// SwiftSettle operates as a sub-account of a parent Nomba account. The
-// `accountId` header is ALWAYS the parent account ID, on every call,
+// SwiftSettle operates as a sub-account of a main Nomba account. The
+// `accountId` header is ALWAYS the main account ID, on every call,
 // including calls that are additionally scoped to the sub-account via a
 // {subAccountId} path segment (see nombaService.js). The two IDs are not
 // interchangeable — mixing them up authenticates against the wrong entity.
@@ -18,14 +18,14 @@ let cachedTokenExpiresAt = 0;
 
 function isConfigured() {
   return Boolean(
-    env.NOMBA_API_KEY && env.NOMBA_API_SECRET && env.NOMBA_PARENT_ACCOUNT_ID && env.NOMBA_SUB_ACCOUNT_ID
+    env.NOMBA_CLIENT_ID && env.NOMBA_PRIVATE_KEY && env.NOMBA_MAIN_ACCOUNT_ID && env.NOMBA_SUB_ACCOUNT_ID
   );
 }
 
 function assertConfigured() {
   if (!isConfigured()) {
     throw new Error(
-      "Nomba is not configured. Set NOMBA_API_KEY, NOMBA_API_SECRET, NOMBA_PARENT_ACCOUNT_ID, and NOMBA_SUB_ACCOUNT_ID in .env."
+      `Nomba is not configured for NOMBA_MODE=${env.NOMBA_MODE}. Set NOMBA_${env.NOMBA_MODE.toUpperCase()}_CLIENT_ID, NOMBA_${env.NOMBA_MODE.toUpperCase()}_PRIVATE_KEY, NOMBA_MAIN_ACCOUNT_ID, and NOMBA_SUB_ACCOUNT_ID in .env.`
     );
   }
 }
@@ -43,10 +43,10 @@ async function getAccessToken() {
     "/v1/auth/token/issue",
     {
       grant_type: "client_credentials",
-      client_id: env.NOMBA_API_KEY,
-      client_secret: env.NOMBA_API_SECRET,
+      client_id: env.NOMBA_CLIENT_ID,
+      client_secret: env.NOMBA_PRIVATE_KEY,
     },
-    { headers: { accountId: env.NOMBA_PARENT_ACCOUNT_ID, "Content-Type": "application/json" } }
+    { headers: { accountId: env.NOMBA_MAIN_ACCOUNT_ID, "Content-Type": "application/json" } }
   );
 
   cachedToken = data.data.access_token;
@@ -69,7 +69,7 @@ async function nombaRequest(config) {
       headers: {
         ...config.headers,
         Authorization: `Bearer ${token}`,
-        accountId: env.NOMBA_PARENT_ACCOUNT_ID,
+        accountId: env.NOMBA_MAIN_ACCOUNT_ID,
       },
     });
     return response.data;

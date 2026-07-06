@@ -268,3 +268,17 @@ create index idx_otp_codes_email on otp_codes(email, expires_at desc);
 
 comment on column workers.password_hash is 'bcrypt hash. Auth is email+password now — phone+OTP was replaced entirely, not kept as an alternative.';
 comment on column workers.email_verified is 'Set true after the signup email-OTP is confirmed. Distinct from identity_verification_status, which tracks the 30-day financial-identity flow.';
+-- 20260706000007_add_email_to_workers.sql
+--
+-- Bug fix: migration 20260706000006 added password_hash/email_verified to
+-- workers and email to otp_codes, but never actually added an `email`
+-- column to `workers` itself — the original BackendPrompt.md schema only
+-- ever had `phone_number` there (from the phone+OTP design this replaced).
+-- Every signup/login query in authController.js does `.eq("email", ...)`
+-- against workers, which has been failing with PGRST204 ("column not
+-- found") since email genuinely never existed on that table.
+
+alter table workers
+  add column if not exists email varchar unique;
+
+comment on column workers.email is 'The account identifier for email+password auth. Missing from the original migration — added here.';

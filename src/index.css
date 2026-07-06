@@ -64,3 +64,14 @@ button {
 button:disabled {
   cursor: not-allowed;
 }
+
+/* Native <select> dropdown popups render with the browser/OS's own
+   background (usually white/light) regardless of the dark classes on the
+   <select> itself — but the light text color we set for the dark theme
+   still gets inherited into <option>, producing unreadable white-on-white.
+   Forcing both explicitly here guarantees the popup list is always
+   readable, independent of what the closed control looks like. */
+select option {
+  background-color: #ffffff;
+  color: #12151b;
+}

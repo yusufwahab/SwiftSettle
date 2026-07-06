@@ -28,8 +28,8 @@ You don't need a Nomba or Brevo account to start developing:
 
 - **No Brevo configured** → OTP codes (and every other notification email) are logged to the server console instead of sent. Signup/login still work end-to-end locally — search the log for `"logging email instead of sending"` to find your OTP code.
 - **No Nomba configured** → any call that needs it (`createVirtualAccount`, `transferToBank`) throws a clear `"Nomba is not configured"` error rather than crashing the server. Onboarding step 2 and settlements will fail until you add real Nomba keys.
-  - Nomba gave you **two account IDs**: a parent "Main Account ID" and your own "sub-account ID". These are not interchangeable — see `NOMBA_PARENT_ACCOUNT_ID` / `NOMBA_SUB_ACCOUNT_ID` in `.env.example` and the comment at the top of `src/config/nomba.js`.
-  - Use the **TEST** Client ID/Private Key while developing. Switch to **LIVE** only when you're actually ready to move real money — don't mix a test key with a live account ID or vice versa.
+  - Nomba gave you **two account IDs**: a "Main (parent) Account ID" and your own "sub-account ID". These are not interchangeable — see `NOMBA_MAIN_ACCOUNT_ID` / `NOMBA_SUB_ACCOUNT_ID` in `.env.example` and the comment at the top of `src/config/nomba.js`.
+  - `.env` variable names match Nomba's own onboarding email exactly (`NOMBA_TEST_CLIENT_ID`, `NOMBA_LIVE_CLIENT_ID`, etc.) — both TEST and LIVE pairs live in `.env` at the same time, and `NOMBA_MODE=test|live` picks which one is actually used. Use `test` while developing; switch to `live` only when you're actually ready to move real money.
   - **Never commit real credentials.** They go in your local `.env` (already gitignored) or your hosting platform's environment settings — not in this repo, not in chat with an AI assistant, nowhere they'd be logged or shared.
 
 Everything else (auth, earnings tracking, financial scoring) works against Supabase alone.
