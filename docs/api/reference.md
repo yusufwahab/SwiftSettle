@@ -7,20 +7,25 @@ All request/response bodies are JSON. All authenticated endpoints require
 
 ## Authentication flow
 
+Email + password, with an email OTP as the one-time signup verification
+step (not phone+OTP — that was fully replaced, not kept as an alternative).
+
 ```
-POST /auth/signup          { phone_number }              -> sends OTP
-POST /auth/verify-otp      { phone_number, otp_code }     -> { token, refresh_token, worker_id }
-GET  /auth/me               (authenticated)                -> current worker profile
-POST /auth/verify-phone-update  (authenticated)  { step, data }  -> apply one onboarding step
-POST /auth/complete-signup      (authenticated)  { ...all fields }  -> apply steps 3-8 at once
-POST /auth/refresh-token    { refresh_token }              -> { token }
-POST /auth/logout          { refresh_token }               -> { success: true }
+POST /auth/signup          { full_name, email, password }  -> sends an email OTP, no session yet
+POST /auth/verify-email    { email, otp_code }              -> { token, refresh_token, worker_id }
+POST /auth/login           { email, password }              -> { token, refresh_token, worker_id }
+GET  /auth/me               (authenticated)                 -> current worker profile
+POST /auth/verify-phone-update  (authenticated)  { step, data }  -> apply one onboarding-wizard step
+POST /auth/complete-signup      (authenticated)  { ...all fields }  -> apply steps 1-4 at once
+POST /auth/refresh-token    { refresh_token }               -> { token }
+POST /auth/logout          { refresh_token }                -> { success: true }
 ```
 
-No passwords anywhere — phone + OTP to get a session, then a PIN (set at
-onboarding step 6) is the only other credential, and it's never used for
-login in this implementation (only stored, for future PIN-gated actions
-like settlement confirmation).
+A brand-new account only exists (with `email_verified: false`) after
+`/auth/signup` — `/auth/verify-email` is what actually activates it and
+issues the first session. `/auth/login` only succeeds once `email_verified`
+is true. A PIN (set at onboarding step 3) is a separate credential, stored
+for future PIN-gated actions — it's never used to log in.
 
 ### Error shape
 
@@ -34,9 +39,13 @@ Every error response looks like:
 | 400 | `validation_error` | Request body failed Joi validation |
 | 401 | `unauthorized` | Missing/invalid/expired access token |
 | 401 | `invalid_otp` | Wrong or expired OTP code |
+| 401 | `invalid_credentials` | Wrong email/password on login |
 | 401 | `invalid_refresh_token` | Refresh token invalid, expired, or revoked |
 | 401 | `invalid_signature` | Webhook signature check failed |
+| 403 | `email_not_verified` | Login attempted before completing signup's email-OTP step |
+| 403 | `account_inactive` | Account has been deactivated |
 | 404 | `not_found` | Resource doesn't exist or doesn't belong to this worker |
+| 409 | `email_already_registered` | Signup attempted with an email that's already verified |
 | 422 | `insufficient_balance` | Settlement amount exceeds available balance |
 | 422 | `no_bank_account` | No verified bank account on file |
 | 422 | `credit_not_available` | Not eligible, or amount exceeds available credit |
@@ -44,21 +53,28 @@ Every error response looks like:
 
 ---
 
-## Onboarding steps (`POST /auth/verify-phone-update`)
+## Onboarding wizard (`POST /auth/verify-phone-update`)
 
-`{ "step": 1-8, "data": { ... } }`. Step 2 (phone+OTP) is handled by
-`verify-otp` directly, not through this endpoint.
+Post-signup, entirely optional — a worker can use the app (view earnings,
+browse the dashboard) with none of this done, but can't settle or request
+credit until steps 1-2 are complete. Every step is independently skippable
+from the frontend; the dashboard/settings pages nudge whoever hasn't
+finished.
+
+`{ "step": 1-4, "data": { ... } }`
 
 | Step | `data` fields |
 |---|---|
-| 3 — Personal info | `full_name`, `date_of_birth`, `state`, `platform` |
-| 4 — Bank account | `bank_name`, `account_number`, `account_holder_name` (triggers Nomba virtual account creation) |
-| 5 — Platform connection | `platform_access_token` |
-| 6 — Security | `pin`, `two_factor_enabled` |
-| 7 — Consent | `data_sharing_consent`, `terms_accepted` |
-| 8 — Done | (no fields — just marks onboarding complete) |
+| 1 — Personal & contact | `date_of_birth`, `state`, `platform`, `phone_number` |
+| 2 — Bank details | `bank_name`, `account_number`, `account_holder_name` (triggers Nomba virtual account creation) |
+| 3 — Security | `pin`, `two_factor_enabled` |
+| 4 — Consent | `data_sharing_consent`, `terms_accepted` — marks onboarding complete |
 
 Response: `{ success: true, next_step: <n+1>, worker: { ...sanitized } }`
+
+(Endpoint name is a holdover from when phone verification lived here —
+that's handled by `/auth/verify-email` now, and this endpoint never
+verifies a phone number, just records it as contact info at step 1.)
 
 ---
 

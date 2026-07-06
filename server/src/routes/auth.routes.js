@@ -6,7 +6,8 @@ const { validate } = require("../utils/validators");
 const router = express.Router();
 
 router.post("/signup", validate("signup"), authController.signup);
-router.post("/verify-otp", validate("verifyOtp"), authController.verifyOtp);
+router.post("/verify-email", validate("verifyEmail"), authController.verifyEmail);
+router.post("/login", validate("login"), authController.login);
 router.post("/verify-phone-update", requireAuth, validate("onboardingStep"), authController.submitOnboardingStep);
 router.post("/complete-signup", requireAuth, validate("completeSignup"), authController.completeSignup);
 router.post("/refresh-token", validate("refreshToken"), authController.refreshToken);

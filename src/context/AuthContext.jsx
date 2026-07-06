@@ -35,19 +35,29 @@ export function AuthProvider({ children }) {
       worker,
       ready,
       isAuthenticated: Boolean(worker),
-      async completeLogin(phone, otp) {
-        const { worker: w } = await authService.verifyOtp(phone, otp);
+      // Step 1 of signup: sends the email OTP. No session yet.
+      async startSignup({ fullName, email, password }) {
+        return authService.signup({ fullName, email, password });
+      },
+      // Step 2: confirms the OTP and logs the new account in.
+      async verifySignupOtp(email, otp) {
+        const { worker: w } = await authService.verifySignupOtp(email, otp);
         persist(w);
         return w;
       },
-      async completeSignup(payload) {
-        const { worker: w } = await authService.signup(payload);
+      async login(email, password) {
+        const { worker: w } = await authService.login(email, password);
         persist(w);
         return w;
       },
       async signOut() {
         await authService.logout();
         persist(null);
+      },
+      // Onboarding wizard steps merge their result into the current
+      // worker rather than replacing it outright.
+      updateWorker(partial) {
+        persist({ ...worker, ...partial });
       },
     }),
     [worker, ready]

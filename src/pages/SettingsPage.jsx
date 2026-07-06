@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { ShieldAlert } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ShieldAlert, ArrowRight } from "lucide-react";
 import AppLayout from "../components/layout/AppLayout";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/dark/Button";
@@ -30,6 +31,20 @@ export default function SettingsPage() {
 
   return (
     <AppLayout title="Settings" breadcrumb="Settings" subtitle="Manage your account and preferences">
+      {!worker?.onboardingCompletedAt && (
+        <Card className="mb-6 flex flex-col gap-4 border border-accent/25 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-bold text-text-1">Your profile isn't complete yet</p>
+            <p className="mt-1 text-sm text-text-3">
+              Add your bank details, PIN, and consent to unlock settlements and credit.
+            </p>
+          </div>
+          <Button as={Link} to="/app/onboarding" className="shrink-0 px-5 py-2.5">
+            Continue Setup <ArrowRight className="h-4 w-4" strokeWidth={1.75} />
+          </Button>
+        </Card>
+      )}
+
       <Card className="mb-6">
         <div className="mb-4 flex items-center justify-between">
           <p className="text-sm font-bold text-text-1">Personal Information</p>
@@ -65,9 +80,9 @@ export default function SettingsPage() {
 
         <p className="mb-4 mt-8 text-sm font-bold text-text-1">Bank Details</p>
         {[
-          { label: "Bank Name", value: worker?.bank.name },
-          { label: "Account Number", value: worker?.bank.accountNumberMasked },
-          { label: "Account Holder", value: worker?.bank.accountHolder },
+          { label: "Bank Name", value: worker?.bank?.name },
+          { label: "Account Number", value: worker?.bank?.accountNumberMasked },
+          { label: "Account Holder", value: worker?.bank?.accountHolder },
         ].map(({ label, value }) => (
           <div key={label} className="flex items-center justify-between border-b border-white/6 py-3 last:border-0">
             <span className="w-32 text-xs text-text-3">{label}</span>

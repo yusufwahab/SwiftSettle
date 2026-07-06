@@ -1,7 +1,10 @@
 # SwiftSettle Backend
 
-Express + Supabase (Postgres) + Nomba + Twilio backend for SwiftSettle's
-financial identity platform. Built from `BackendPrompt.md` / `updatedPrompt.md`.
+Express + Supabase (Postgres) + Nomba + Brevo backend for SwiftSettle's
+financial identity platform. Built from `BackendPrompt.md` / `updatedPrompt.md`,
+with one significant later change: auth moved from passwordless phone+OTP to
+email+password with an email-OTP verification step (Brevo), per direct
+follow-up instruction — see the deviations list below.
 
 ## Setup
 
@@ -10,7 +13,7 @@ financial identity platform. Built from `BackendPrompt.md` / `updatedPrompt.md`.
    - Paste `src/db/schema.sql` into the Supabase SQL editor and run it, or
    - Use the Supabase CLI against `supabase/migrations/` (project root, one level up) with `supabase link` + `supabase db push`.
 3. **Get your keys**: Settings → API for `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
-4. **Copy `.env.example` to `.env`** and fill in what you have. Only `SUPABASE_*` and the two JWT secrets are strictly required to boot — Nomba/Twilio/SendGrid are optional at boot time (see "Running without every credential" below).
+4. **Copy `.env.example` to `.env`** and fill in what you have. Only `SUPABASE_*` and the two JWT secrets are strictly required to boot — Nomba/Brevo are optional at boot time (see "Running without every credential" below).
 5. **Install and run:**
    ```
    npm install
@@ -21,14 +24,13 @@ financial identity platform. Built from `BackendPrompt.md` / `updatedPrompt.md`.
 
 ## Running without every credential
 
-You don't need a Nomba or Twilio account to start developing:
+You don't need a Nomba or Brevo account to start developing:
 
-- **No Twilio configured** → OTP codes are logged to the server console instead of texted. Signup/login still work end-to-end locally.
-- **No Nomba configured** → any call that needs it (`createVirtualAccount`, `transferToBank`) throws a clear `"Nomba is not configured"` error rather than crashing the server. Onboarding step 4 and settlements will fail until you add real Nomba keys.
+- **No Brevo configured** → OTP codes (and every other notification email) are logged to the server console instead of sent. Signup/login still work end-to-end locally — search the log for `"logging email instead of sending"` to find your OTP code.
+- **No Nomba configured** → any call that needs it (`createVirtualAccount`, `transferToBank`) throws a clear `"Nomba is not configured"` error rather than crashing the server. Onboarding step 2 and settlements will fail until you add real Nomba keys.
   - Nomba gave you **two account IDs**: a parent "Main Account ID" and your own "sub-account ID". These are not interchangeable — see `NOMBA_PARENT_ACCOUNT_ID` / `NOMBA_SUB_ACCOUNT_ID` in `.env.example` and the comment at the top of `src/config/nomba.js`.
   - Use the **TEST** Client ID/Private Key while developing. Switch to **LIVE** only when you're actually ready to move real money — don't mix a test key with a live account ID or vice versa.
   - **Never commit real credentials.** They go in your local `.env` (already gitignored) or your hosting platform's environment settings — not in this repo, not in chat with an AI assistant, nowhere they'd be logged or shared.
-- **No SendGrid configured** → notification emails are logged instead of sent.
 
 Everything else (auth, earnings tracking, financial scoring) works against Supabase alone.
 
@@ -41,7 +43,7 @@ server/
 │   ├── middleware/   auth.js (JWT), errorHandler.js, validateWebhook.js, corsHandler.js
 │   ├── routes/       one file per resource, mounted under /api in routes/index.js
 │   ├── controllers/  request handling + response shaping
-│   ├── services/     nombaService, twilioService, scoringService, platformService, emailService
+│   ├── services/     nombaService, scoringService, platformService, emailService (Brevo)
 │   ├── utils/        jwt.js, validators.js (Joi schemas), logger.js, helpers.js
 │   ├── jobs/         scoreScheduler.js — daily 30-day auto-trigger (node-schedule)
 │   └── db/schema.sql consolidated copy of ../../supabase/migrations/*.sql
@@ -63,6 +65,9 @@ Both `updatedPrompt.md` and `BackendPrompt.md` describe the system at a level th
 - **Available-credit formula, interest rate application, and credit-tier score bands are inferred**, not given as exact formulas anywhere — see comments in `creditController.js` and `scoringService.js`.
 - **The 30-day auto-trigger does not auto-create a `credit_requests` row.** `BackendPrompt.md`'s service outline lists that as a side effect, but the actual credit flow it describes elsewhere is worker-initiated ("Worker taps 'Request Credit'"). Treated as a real contradiction between two parts of the same prompt rather than silently picking one.
 - **No admin UI** — per the explicit "don't create admin UI" instruction, `GET /api/admin/behavioral-analytics` is a bare API endpoint gated by an `ADMIN_API_KEY` header, nothing else.
+- **Auth changed from phone+OTP to email+password, per direct follow-up instruction (not part of either original prompt).** `POST /auth/signup` now takes `full_name`/`email`/`password`; `POST /auth/verify-email` confirms an email OTP (sent via Brevo) and is what actually issues the first session; `POST /auth/login` is plain email+password. Twilio is gone entirely — there's no SMS anywhere in this backend anymore. `workers.password_hash` and `workers.email_verified` were added; `workers.phone_number` was relaxed to nullable since it's no longer collected at signup.
+- **Onboarding wizard shrank from 8 steps to 4** (personal/contact, bank, security, consent) and moved entirely to *after* signup, and every step is skippable — the frontend shows a persistent "complete your profile" nudge on the dashboard and settings page instead of blocking anything. `POST /auth/verify-phone-update`'s name is a holdover from the old design; it no longer verifies a phone number (that endpoint doesn't exist anymore) — it just records one as contact info at step 1.
+- **Brevo replaces both Twilio (OTP) and SendGrid (notifications)** — verified against `developers.brevo.com`: `POST https://api.brevo.com/v3/smtp/email` with an `api-key` header, not a bearer token.
 
 See `docs/database/relationships.md` (project root) for the full schema-level writeup.
 

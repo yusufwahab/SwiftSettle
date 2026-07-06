@@ -1,6 +1,6 @@
 const bcrypt = require("bcryptjs");
 const supabase = require("../config/database");
-const twilioService = require("../services/twilioService");
+const emailService = require("../services/emailService");
 const nombaService = require("../services/nombaService");
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require("../utils/jwt");
 const { generateOtpCode } = require("../utils/helpers");
@@ -8,41 +8,54 @@ const { ApiError } = require("../middleware/errorHandler");
 
 const OTP_TTL_MS = 5 * 60 * 1000;
 
-async function findOrCreateWorkerByPhone(phoneNumber) {
-  const { data: existing } = await supabase
-    .from("workers")
-    .select("*")
-    .eq("phone_number", phoneNumber)
-    .maybeSingle();
-  if (existing) return existing;
+async function sendEmailOtp(worker) {
+  const code = generateOtpCode();
+  const codeHash = await bcrypt.hash(code, 10);
 
-  const { data: created, error } = await supabase
-    .from("workers")
-    .insert({ phone_number: phoneNumber })
-    .select()
-    .single();
+  const { error } = await supabase.from("otp_codes").insert({
+    email: worker.email,
+    code: codeHash,
+    expires_at: new Date(Date.now() + OTP_TTL_MS).toISOString(),
+  });
   if (error) throw error;
-  return created;
+
+  await emailService.sendOtpEmail(worker.email, code);
 }
 
-// POST /auth/signup
+// POST /auth/signup — { full_name, email, password }
 async function signup(req, res, next) {
   try {
-    const { phone_number: phoneNumber } = req.body;
-    await findOrCreateWorkerByPhone(phoneNumber);
+    const { full_name: fullName, email, password } = req.body;
 
-    const code = generateOtpCode();
-    const codeHash = await bcrypt.hash(code, 10);
+    const { data: existing } = await supabase.from("workers").select("*").eq("email", email).maybeSingle();
+    if (existing?.email_verified) {
+      throw new ApiError(409, "email_already_registered", "That email is already registered. Try logging in instead.");
+    }
 
-    const { error } = await supabase.from("otp_codes").insert({
-      phone_number: phoneNumber,
-      code: codeHash,
-      expires_at: new Date(Date.now() + OTP_TTL_MS).toISOString(),
-    });
-    if (error) throw error;
+    const passwordHash = await bcrypt.hash(password, 10);
+    let worker = existing;
 
-    await twilioService.sendOtpSms(phoneNumber, code);
+    if (worker) {
+      // Abandoned signup (never verified) — let them retry with fresh details.
+      const { data: updated, error } = await supabase
+        .from("workers")
+        .update({ full_name: fullName, password_hash: passwordHash })
+        .eq("id", worker.id)
+        .select()
+        .single();
+      if (error) throw error;
+      worker = updated;
+    } else {
+      const { data: created, error } = await supabase
+        .from("workers")
+        .insert({ full_name: fullName, email, password_hash: passwordHash })
+        .select()
+        .single();
+      if (error) throw error;
+      worker = created;
+    }
 
+    await sendEmailOtp(worker);
     res.json({ otp_sent: true, retry_in: 60 });
   } catch (err) {
     next(err);
@@ -63,15 +76,17 @@ async function issueSession(workerId) {
   return { token, refreshToken };
 }
 
-// POST /auth/verify-otp
-async function verifyOtp(req, res, next) {
+// POST /auth/verify-email — { email, otp_code }
+// Confirms the signup email-OTP and logs the worker in — this is the only
+// place a session gets issued for a brand-new account.
+async function verifyEmail(req, res, next) {
   try {
-    const { phone_number: phoneNumber, otp_code: otpCode } = req.body;
+    const { email, otp_code: otpCode } = req.body;
 
     const { data: candidates, error } = await supabase
       .from("otp_codes")
       .select("*")
-      .eq("phone_number", phoneNumber)
+      .eq("email", email)
       .is("consumed_at", null)
       .gte("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false })
@@ -88,36 +103,61 @@ async function verifyOtp(req, res, next) {
 
     const { data: worker, error: workerError } = await supabase
       .from("workers")
-      .update({ phone_verified: true, last_login: new Date().toISOString() })
-      .eq("phone_number", phoneNumber)
+      .update({ email_verified: true, last_login: new Date().toISOString() })
+      .eq("email", email)
       .select()
       .single();
     if (workerError) throw workerError;
 
     const { token, refreshToken } = await issueSession(worker.id);
-
     res.json({ token, refresh_token: refreshToken, worker_id: worker.id });
   } catch (err) {
     next(err);
   }
 }
 
-// Applies one onboarding step's data to a worker row. Shared by both
+// POST /auth/login — { email, password }
+async function login(req, res, next) {
+  try {
+    const { email, password } = req.body;
+
+    const { data: worker } = await supabase.from("workers").select("*").eq("email", email).maybeSingle();
+    const matches = worker?.password_hash && (await bcrypt.compare(password, worker.password_hash));
+    if (!matches) {
+      throw new ApiError(401, "invalid_credentials", "Incorrect email or password.");
+    }
+    if (!worker.email_verified) {
+      throw new ApiError(403, "email_not_verified", "Verify your email before signing in.");
+    }
+    if (!worker.is_active) {
+      throw new ApiError(403, "account_inactive", "This account is no longer active.");
+    }
+
+    await supabase.from("workers").update({ last_login: new Date().toISOString() }).eq("id", worker.id);
+
+    const { token, refreshToken } = await issueSession(worker.id);
+    res.json({ token, refresh_token: refreshToken, worker_id: worker.id });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Applies one onboarding-wizard step to a worker row. Shared by both
 // POST /auth/verify-phone-update (step-by-step) and
 // POST /auth/complete-signup (everything at once).
 async function applyOnboardingStep(worker, step, data) {
   const updates = { onboarding_step: Math.max(worker.onboarding_step, step) };
 
-  if (step === 3) {
+  if (step === 1) {
     Object.assign(updates, {
-      full_name: data.full_name,
       date_of_birth: data.date_of_birth,
       state: data.state,
       platform: data.platform,
+      phone_number: data.phone_number,
     });
   }
 
-  if (step === 4) {
+  if (step === 2) {
     Object.assign(updates, {
       bank_name: data.bank_name,
       account_number: data.account_number,
@@ -126,7 +166,7 @@ async function applyOnboardingStep(worker, step, data) {
     });
 
     if (!worker.nomba_virtual_account_id) {
-      const va = await nombaService.createVirtualAccount({ ...worker, full_name: data.full_name || worker.full_name });
+      const va = await nombaService.createVirtualAccount({ ...worker, full_name: worker.full_name });
       updates.nomba_virtual_account_id = va.accountRef;
       await supabase.from("virtual_accounts").insert({
         worker_id: worker.id,
@@ -138,27 +178,17 @@ async function applyOnboardingStep(worker, step, data) {
     }
   }
 
-  if (step === 5) {
-    Object.assign(updates, {
-      platform_connected: true,
-      platform_access_token: data.platform_access_token || null,
-    });
-  }
-
-  if (step === 6) {
+  if (step === 3) {
     if (data.pin) updates.pin_hash = await bcrypt.hash(data.pin, 10);
     if (typeof data.two_factor_enabled === "boolean") updates.two_factor_enabled = data.two_factor_enabled;
   }
 
-  if (step === 7) {
+  if (step === 4) {
     Object.assign(updates, {
       data_sharing_consent: Boolean(data.data_sharing_consent),
       terms_accepted: Boolean(data.terms_accepted),
+      onboarding_completed_at: new Date().toISOString(),
     });
-  }
-
-  if (step === 8) {
-    updates.onboarding_completed_at = new Date().toISOString();
   }
 
   const { data: updatedWorker, error } = await supabase
@@ -171,29 +201,31 @@ async function applyOnboardingStep(worker, step, data) {
   return updatedWorker;
 }
 
-// POST /auth/verify-phone-update  (onboarding step submission)
-// Named per BackendPrompt.md; despite the name, this handles every step
-// (2-8) of the onboarding wizard, not just phone verification (step 2 is
-// covered separately by verify-otp).
+// POST /auth/verify-phone-update — named per BackendPrompt.md, but this
+// endpoint now handles every onboarding-wizard step (1-4). The name is a
+// holdover; phone verification itself no longer happens here (or anywhere
+// — auth is email+password, phone is just contact info collected at step 1).
 async function submitOnboardingStep(req, res, next) {
   try {
     const { step, data } = req.body;
     const updatedWorker = await applyOnboardingStep(req.worker, step, data || {});
-    res.json({ success: true, next_step: Math.min(8, step + 1), worker: sanitizeWorker(updatedWorker) });
+    res.json({ success: true, next_step: Math.min(4, step + 1), worker: sanitizeWorker(updatedWorker) });
   } catch (err) {
     next(err);
   }
 }
 
 // POST /auth/complete-signup — one-shot alternative to stepping through
-// verify-phone-update 3-8 individually.
+// verify-phone-update 1-4 individually. Despite the name, this is the
+// onboarding wizard's "do it all at once" path, not account creation
+// (that's POST /auth/signup + /auth/verify-email now).
 async function completeSignup(req, res, next) {
   try {
     let worker = req.worker;
-    for (const step of [3, 4, 5, 6, 7, 8]) {
+    for (const step of [1, 2, 3, 4]) {
       worker = await applyOnboardingStep(worker, step, req.body);
     }
-    res.json({ token: signAccessToken(worker.id), worker_id: worker.id, onboarding_complete: true });
+    res.json({ worker_id: worker.id, onboarding_complete: true });
   } catch (err) {
     next(err);
   }
@@ -239,8 +271,9 @@ async function logout(req, res, next) {
 
 // GET /auth/me — not in BackendPrompt.md's endpoint list, added because
 // nothing else returns the logged-in worker's own profile (name, email,
-// bank details, financial_score, ...), which the frontend needs to render
-// the sidebar, settings page, and dashboard header at all.
+// bank details, financial_score, onboarding progress, ...), which the
+// frontend needs to render the sidebar, settings page, dashboard nudge
+// banner, and onboarding wizard at all.
 async function getMe(req, res, next) {
   try {
     res.json({ worker: sanitizeWorker(req.worker) });
@@ -251,13 +284,14 @@ async function getMe(req, res, next) {
 
 function sanitizeWorker(worker) {
   // eslint-disable-next-line no-unused-vars
-  const { pin_hash, platform_access_token, ...safe } = worker;
+  const { pin_hash, password_hash, platform_access_token, ...safe } = worker;
   return safe;
 }
 
 module.exports = {
   signup,
-  verifyOtp,
+  verifyEmail,
+  login,
   submitOnboardingStep,
   completeSignup,
   refreshToken,

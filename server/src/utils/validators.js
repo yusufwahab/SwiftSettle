@@ -2,27 +2,43 @@ const Joi = require("joi");
 
 const phoneSchema = Joi.string()
   .pattern(/^\+?[0-9]{10,15}$/)
-  .required()
   .messages({ "string.pattern.base": "Enter a valid phone number." });
 
 const schemas = {
-  signup: Joi.object({ phone_number: phoneSchema }),
+  // Auth is email + password now (phone+OTP was fully replaced, not kept
+  // as an alternative). Signup only collects the bare minimum — everything
+  // else (phone, bank, PIN, consent) is the post-signup onboarding wizard.
+  signup: Joi.object({
+    full_name: Joi.string().min(2).required(),
+    email: Joi.string().email().required(),
+    password: Joi.string().min(8).required(),
+  }),
 
-  verifyOtp: Joi.object({
-    phone_number: phoneSchema,
+  verifyEmail: Joi.object({
+    email: Joi.string().email().required(),
     otp_code: Joi.string().length(6).required(),
   }),
 
+  login: Joi.object({
+    email: Joi.string().email().required(),
+    password: Joi.string().required(),
+  }),
+
+  // Onboarding wizard, steps 1-4 (post-signup, all skippable):
+  //   1 personal/contact (dob, state, platform, phone)
+  //   2 bank details (+ Nomba virtual account creation)
+  //   3 security (pin, 2FA)
+  //   4 terms & consent (marks onboarding complete)
   onboardingStep: Joi.object({
-    step: Joi.number().integer().min(1).max(8).required(),
+    step: Joi.number().integer().min(1).max(4).required(),
     data: Joi.object().required(),
   }),
 
   completeSignup: Joi.object({
-    full_name: Joi.string().min(2).required(),
     date_of_birth: Joi.date().iso().required(),
     state: Joi.string().required(),
     platform: Joi.string().required(),
+    phone_number: phoneSchema.required(),
     bank_name: Joi.string().required(),
     account_number: Joi.string().required(),
     account_holder_name: Joi.string().required(),

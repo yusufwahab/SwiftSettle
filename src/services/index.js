@@ -12,11 +12,13 @@ import { settlementsService as mockSettlementsService } from "./mock/settlements
 import { supportService as mockSupportService } from "./mock/supportService";
 import { preferencesService as mockPreferencesService } from "./mock/preferencesService";
 import { notificationsService as mockNotificationsService } from "./mock/notificationsService";
+import { onboardingService as mockOnboardingService } from "./mock/onboardingService";
 
 import { authService as liveAuthService } from "./live/authService";
 import { walletService as liveWalletService } from "./live/walletService";
 import { earningsService as liveEarningsService } from "./live/earningsService";
 import { settlementsService as liveSettlementsService } from "./live/settlementsService";
+import { onboardingService as liveOnboardingService } from "./live/onboardingService";
 
 const registry = {
   mock: {
@@ -27,12 +29,14 @@ const registry = {
     supportService: mockSupportService,
     preferencesService: mockPreferencesService,
     notificationsService: mockNotificationsService,
+    onboardingService: mockOnboardingService,
   },
   live: {
     authService: liveAuthService,
     walletService: liveWalletService,
     earningsService: liveEarningsService,
     settlementsService: liveSettlementsService,
+    onboardingService: liveOnboardingService,
     // No backend exists for support/FAQ, notification-panel copy, or
     // notification preferences in either prompt — live mode still reads
     // this canned content rather than the app breaking outright.
@@ -51,3 +55,4 @@ export const settlementsService = active.settlementsService;
 export const supportService = active.supportService;
 export const preferencesService = active.preferencesService;
 export const notificationsService = active.notificationsService;
+export const onboardingService = active.onboardingService;

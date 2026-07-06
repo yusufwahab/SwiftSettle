@@ -3,16 +3,14 @@ import { Link, useNavigate } from "react-router-dom";
 import Photo from "../components/Photo";
 import Button from "../components/ui/dark/Button";
 import { TextField } from "../components/ui/dark/Field";
-import { authService } from "../services";
 import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { completeLogin } = useAuth();
+  const { login } = useAuth();
 
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [step, setStep] = useState("phone");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -21,13 +19,8 @@ export default function LoginPage() {
     setError("");
     setSubmitting(true);
     try {
-      if (step === "phone") {
-        await authService.requestOtp(phone);
-        setStep("otp");
-      } else {
-        await completeLogin(phone, otp);
-        navigate("/app/dashboard");
-      }
+      await login(email, password);
+      navigate("/app/dashboard");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -51,33 +44,26 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <TextField
-              label="Phone Number"
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+234 (0) 800 000 0000"
-              help="We'll send you an OTP to verify"
-              disabled={step === "otp"}
+              label="Email Address"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="chioma@example.com"
               required
             />
-
-            {step === "otp" && (
-              <TextField
-                label="Enter OTP"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                placeholder="000000"
-                maxLength={6}
-                help="Check your phone or email"
-                autoFocus
-                required
-              />
-            )}
+            <TextField
+              label="Password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+            />
 
             {error && <p className="text-sm text-danger-vivid">{error}</p>}
 
             <Button type="submit" disabled={submitting} className="w-full">
-              {submitting ? "Please wait…" : step === "phone" ? "Send OTP" : "Sign In"}
+              {submitting ? "Signing in…" : "Sign In"}
             </Button>
           </form>
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Wallet, TrendingUp, Clock, CalendarDays, Building2, Bell, Mail, MessageCircle, Phone,
-  CheckCircle2, Info, AlertTriangle, ShieldAlert,
+  CheckCircle2, Info, AlertTriangle, ShieldAlert, ArrowRight,
 } from "lucide-react";
 import { AreaChart, Area, ResponsiveContainer, YAxis } from "recharts";
 import { Link } from "react-router-dom";
@@ -16,6 +16,7 @@ import { formatNaira } from "../lib/format";
 import { chartColors } from "../lib/chartTheme";
 import { walletService, earningsService, notificationsService } from "../services";
 import { useAsync } from "../hooks/useAsync";
+import { useAuth } from "../context/AuthContext";
 
 const notifTone = {
   success: { icon: CheckCircle2, className: "text-accent-2 bg-accent-2/12" },
@@ -25,6 +26,7 @@ const notifTone = {
 };
 
 export default function Dashboard() {
+  const { worker } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const balanceState = useAsync(() => walletService.getBalance(), []);
   const activityState = useAsync(() => walletService.getTodayActivity(), []);
@@ -34,6 +36,7 @@ export default function Dashboard() {
 
   return (
     <AppLayout title="Dashboard" breadcrumb="Overview" rightRail={<RightRail notifState={notifState} />}>
+      {!worker?.onboardingCompletedAt && <OnboardingNudge step={worker?.onboardingStep} />}
       <BalanceCard state={balanceState} onSettle={() => setModalOpen(true)} />
 
       <div className="mt-5 grid gap-5 sm:grid-cols-3">
@@ -162,6 +165,24 @@ export default function Dashboard() {
         onSettled={balanceState.reload}
       />
     </AppLayout>
+  );
+}
+
+function OnboardingNudge({ step }) {
+  const remaining = 4 - Math.min(step || 1, 4) + 1;
+  return (
+    <Card className="mb-5 flex flex-col gap-4 border border-accent/25 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="text-sm font-bold text-text-1">Finish setting up your account</p>
+        <p className="mt-1 text-sm text-text-3">
+          Add your bank details and security PIN to unlock settlements and start building your financial score.
+          {remaining > 1 ? ` ${remaining} steps left.` : " Almost done."}
+        </p>
+      </div>
+      <Button as={Link} to="/app/onboarding" className="shrink-0 px-5 py-2.5">
+        Continue Setup <ArrowRight className="h-4 w-4" strokeWidth={1.75} />
+      </Button>
+    </Card>
   );
 }
 

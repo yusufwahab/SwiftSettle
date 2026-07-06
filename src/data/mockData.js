@@ -22,8 +22,11 @@ export const currentWorker = {
   fullName: "Chioma Adeyemi",
   shortName: "Chioma A.",
   email: "chioma@example.com",
+  emailVerified: true,
   phone: "+234 801 234 5678",
   dateOfBirth: "15 Mar 1995",
+  state: "Lagos",
+  platform: "Uber",
   bank: {
     name: "Guaranty Trust Bank (GTB)",
     accountNumber: "0123465678",
@@ -31,6 +34,13 @@ export const currentWorker = {
     accountHolder: "Chioma Adeyemi",
     isPrimary: true,
   },
+  bankVerified: true,
+  financialScore: 712,
+  creditTier: "standard",
+  identityVerificationStatus: "verified",
+  twoFactorEnabled: false,
+  onboardingStep: 4,
+  onboardingCompletedAt: "2026-06-01T09:00:00.000Z",
 };
 
 export const balanceSummary = {

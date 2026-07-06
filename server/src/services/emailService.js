@@ -2,51 +2,68 @@ const axios = require("axios");
 const env = require("../config/env");
 const logger = require("../utils/logger");
 
-// Sends via SendGrid's HTTP API directly (no @sendgrid/mail dependency,
-// since it wasn't in BackendPrompt.md's package.json list). Falls back to
-// logging the notification instead of sending when unconfigured, same
-// pattern as twilioService — lets the rest of the app function without a
-// SendGrid account yet.
-async function send(to, subject, body) {
-  if (!env.SENDGRID_API_KEY) {
-    logger.warn("SENDGRID_API_KEY not configured — logging notification instead of emailing", {
-      to,
-      subject,
-      body,
-    });
+// Verified against developers.brevo.com (2026-07-06):
+//   POST https://api.brevo.com/v3/smtp/email
+//   headers: api-key, Content-Type: application/json
+//   body: { sender: {email, name}, to: [{email, name}], subject, htmlContent }
+// Falls back to logging instead of sending when unconfigured, same pattern
+// as the rest of this backend's third-party integrations — lets the app
+// run locally before you've created a Brevo account.
+async function send(to, subject, htmlContent, { name } = {}) {
+  if (!env.BREVO_API_KEY) {
+    logger.warn("BREVO_API_KEY not configured — logging email instead of sending", { to, subject, htmlContent });
     return { delivered: false, mode: "console" };
   }
 
   await axios.post(
-    "https://api.sendgrid.com/v3/mail/send",
+    "https://api.brevo.com/v3/smtp/email",
     {
-      personalizations: [{ to: [{ email: to }] }],
-      from: { email: "notifications@swiftsettle.app", name: "SwiftSettle" },
+      sender: { email: env.BREVO_SENDER_EMAIL, name: env.BREVO_SENDER_NAME },
+      to: [{ email: to, name: name || to }],
       subject,
-      content: [{ type: "text/plain", value: body }],
+      htmlContent,
     },
-    { headers: { Authorization: `Bearer ${env.SENDGRID_API_KEY}` } }
+    { headers: { "api-key": env.BREVO_API_KEY, "Content-Type": "application/json" } }
   );
 
   return { delivered: true, mode: "email" };
 }
 
+// Signup / login email-OTP delivery — this is now the *only* OTP channel
+// in the app (auth moved from phone+OTP to email+password with an
+// email-verification code at signup).
+async function sendOtpEmail(email, code) {
+  return send(
+    email,
+    "Your SwiftSettle verification code",
+    `<p>Your SwiftSettle verification code is <strong>${code}</strong>.</p><p>It expires in 5 minutes.</p>`
+  );
+}
+
 // The 5 notification copies specified in updatedPrompt.md section 8.
 const notifications = {
   daysUntilCertificate: (email, days) =>
-    send(email, "You're getting close!", `You're ${days} days away from your financial identity certificate.`),
+    send(email, "You're getting close!", `<p>You're ${days} days away from your financial identity certificate.</p>`),
 
   scoreImproved: (email, points) =>
-    send(email, "Your score just went up", `Your financial score just improved by ${points} points.`),
+    send(email, "Your score just went up", `<p>Your financial score just improved by ${points} points.</p>`),
 
   creditEligible: (email, amount) =>
-    send(email, "You're eligible for credit", `You're eligible for credit access now (₦${amount.toLocaleString()} available).`),
+    send(
+      email,
+      "You're eligible for credit",
+      `<p>You're eligible for credit access now (₦${amount.toLocaleString()} available).</p>`
+    ),
 
   creditApproved: (email, amount, rate) =>
-    send(email, "Credit approved", `Your credit was approved: ₦${amount.toLocaleString()} at ${rate}% interest.`),
+    send(email, "Credit approved", `<p>Your credit was approved: ₦${amount.toLocaleString()} at ${rate}% interest.</p>`),
 
   dailyRepayment: (email, amount) =>
-    send(email, "Daily repayment deducted", `Daily credit repayment: ₦${amount.toLocaleString()} deducted from today's settlement.`),
+    send(
+      email,
+      "Daily repayment deducted",
+      `<p>Daily credit repayment: ₦${amount.toLocaleString()} deducted from today's settlement.</p>`
+    ),
 };
 
-module.exports = { send, notifications };
+module.exports = { send, sendOtpEmail, notifications };

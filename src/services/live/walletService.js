@@ -1,10 +1,5 @@
 import { apiRequest } from "../../lib/apiClient";
-
-function maskAccountNumber(accountNumber) {
-  if (!accountNumber) return "";
-  const last4 = accountNumber.slice(-4);
-  return `**** **** ${last4}`;
-}
+import { maskAccountNumber } from "../../lib/format";
 
 export const walletService = {
   // GET /earnings/balance only returns { balance, updated_at, daily_total,

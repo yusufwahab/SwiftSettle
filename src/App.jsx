@@ -5,6 +5,7 @@ import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import Dashboard from "./pages/Dashboard";
+import OnboardingWizard from "./pages/OnboardingWizard";
 import SettlementsPage from "./pages/SettlementsPage";
 import EarningsPage from "./pages/EarningsPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -24,6 +25,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/onboarding"
+            element={
+              <ProtectedRoute>
+                <OnboardingWizard />
               </ProtectedRoute>
             }
           />

@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Environment variables — real secrets never get committed. .env.example
+# files are templates and stay tracked; explicit patterns below (not a
+# blanket .env*) make sure that distinction holds.
+.env
+.env.local
+.env.*.local
+server/.env
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

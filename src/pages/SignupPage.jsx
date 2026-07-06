@@ -1,92 +1,53 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Photo from "../components/Photo";
 import Button from "../components/ui/dark/Button";
-import { TextField, SelectField, Checkbox } from "../components/ui/dark/Field";
-import { nigerianBanks } from "../data/mockData";
-import { authService } from "../services";
+import { TextField } from "../components/ui/dark/Field";
 import { useAuth } from "../context/AuthContext";
-
-const platforms = ["Uber", "Bolt", "Jumia Food", "Glovo", "Chowdeck", "DoorDash", "Other"];
-const nigerianStates = [
-  "Lagos", "Abuja (FCT)", "Rivers", "Oyo", "Kano", "Kaduna", "Ogun", "Enugu", "Delta", "Edo",
-];
-
-const initialForm = {
-  fullName: "",
-  email: "",
-  phone: "",
-  dob: "",
-  state: "",
-  platform: "",
-  accountNumber: "",
-  bank: "",
-  accountType: "Savings",
-  pin: "",
-  confirmPin: "",
-  otp: "",
-};
 
 export default function SignupPage() {
   const navigate = useNavigate();
-  const { completeSignup } = useAuth();
+  const { startSignup, verifySignupOtp } = useAuth();
 
-  const [form, setForm] = useState(initialForm);
-  const [otpSent, setOtpSent] = useState(false);
-  const [countdown, setCountdown] = useState(0);
-  const [agreed, setAgreed] = useState(false);
+  const [step, setStep] = useState("form"); // 'form' | 'otp'
+  const [form, setForm] = useState({ fullName: "", email: "", password: "", confirmPassword: "" });
+  const [otp, setOtp] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [otpError, setOtpError] = useState("");
-  const [formError, setFormError] = useState("");
-
-  useEffect(() => {
-    if (countdown <= 0) return;
-    const id = setTimeout(() => setCountdown((c) => c - 1), 1000);
-    return () => clearTimeout(id);
-  }, [countdown]);
+  const [error, setError] = useState("");
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  const sendOtp = async () => {
-    setOtpError("");
-    try {
-      await authService.requestOtp(form.phone);
-      setOtpSent(true);
-      setCountdown(30);
-    } catch (err) {
-      setOtpError(err.message);
-    }
-  };
-
-  const handleSubmit = async (event) => {
+  const handleCreateAccount = async (event) => {
     event.preventDefault();
-    setFormError("");
-    if (form.pin !== form.confirmPin) {
-      setFormError("PINs do not match.");
+    setError("");
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match.");
       return;
     }
-    if (!otpSent) {
-      setFormError("Verify your phone number first.");
+    if (form.password.length < 8) {
+      setError("Password must be at least 8 characters.");
       return;
     }
     setSubmitting(true);
     try {
-      await completeSignup({
-        phone: form.phone,
-        otp: form.otp,
-        fullName: form.fullName,
-        email: form.email,
-        dateOfBirth: form.dob,
-        state: form.state,
-        platform: form.platform,
-        bank: { name: form.bank, accountNumber: form.accountNumber, accountHolder: form.fullName },
-        pin: form.pin,
-        dataSharingConsent: agreed,
-        termsAccepted: agreed,
-      });
+      await startSignup(form);
+      setStep("otp");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleVerify = async (event) => {
+    event.preventDefault();
+    setError("");
+    setSubmitting(true);
+    try {
+      await verifySignupOtp(form.email, otp);
       navigate("/app/dashboard");
     } catch (err) {
-      setFormError(err.message);
+      setError(err.message);
     } finally {
       setSubmitting(false);
     }
@@ -98,140 +59,77 @@ export default function SignupPage() {
         aria-hidden
         className="pointer-events-none absolute -left-40 -top-40 h-[420px] w-[420px] rounded-full bg-accent/20 blur-[130px]"
       />
-      <div className="relative z-10 w-full px-6 py-16 sm:px-10 lg:w-1/2 lg:px-16">
-        <div className="mx-auto max-w-sm">
+      <div className="relative z-10 flex w-full flex-col justify-center px-6 py-16 sm:px-10 lg:w-1/2 lg:px-16">
+        <div className="mx-auto w-full max-w-sm">
           <Link to="/" className="text-xl font-bold text-text-1">
             SwiftSettle
           </Link>
           <h1 className="mt-8 text-3xl font-bold text-text-1">Get Started</h1>
-          <p className="mb-8 mt-2 text-base text-text-3">Create your SwiftSettle account in 2 minutes</p>
+          <p className="mb-8 mt-2 text-base text-text-3">
+            {step === "form"
+              ? "Create your account in under a minute."
+              : `Enter the code we emailed to ${form.email}.`}
+          </p>
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-text-3">
-              Personal information
-            </p>
-            <TextField label="Full Name" value={form.fullName} onChange={set("fullName")} placeholder="Chioma Adeyemi" required />
-            <TextField label="Email Address" type="email" value={form.email} onChange={set("email")} placeholder="chioma@example.com" required />
-            <TextField label="Phone Number" type="tel" value={form.phone} onChange={set("phone")} placeholder="+234 (0) 800 000 0000" required />
-            <TextField label="Date of Birth" value={form.dob} onChange={set("dob")} placeholder="DD/MM/YYYY" required />
-            <SelectField label="State" value={form.state} onChange={set("state")} required>
-              <option value="">Select your state</option>
-              {nigerianStates.map((state) => (
-                <option key={state} value={state}>
-                  {state}
-                </option>
-              ))}
-            </SelectField>
-            <SelectField label="Platform" value={form.platform} onChange={set("platform")} required>
-              <option value="">Which platform do you work for?</option>
-              {platforms.map((platform) => (
-                <option key={platform} value={platform}>
-                  {platform}
-                </option>
-              ))}
-            </SelectField>
+          {step === "form" ? (
+            <form onSubmit={handleCreateAccount} className="flex flex-col gap-5">
+              <TextField label="Full Name" value={form.fullName} onChange={set("fullName")} placeholder="Chioma Adeyemi" required />
+              <TextField label="Email Address" type="email" value={form.email} onChange={set("email")} placeholder="chioma@example.com" required />
+              <TextField
+                label="Password"
+                type="password"
+                value={form.password}
+                onChange={set("password")}
+                placeholder="••••••••"
+                help="Minimum 8 characters"
+                required
+              />
+              <TextField
+                label="Confirm Password"
+                type="password"
+                value={form.confirmPassword}
+                onChange={set("confirmPassword")}
+                placeholder="••••••••"
+                required
+              />
 
-            <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-text-3">Bank details</p>
-            <TextField
-              label="Bank Account Number"
-              value={form.accountNumber}
-              onChange={set("accountNumber")}
-              placeholder="1234567890"
-              help="Where we'll settle your earnings"
-              required
-            />
-            <SelectField label="Select Your Bank" value={form.bank} onChange={set("bank")} required>
-              <option value="">Choose your bank</option>
-              {nigerianBanks.map((bank) => (
-                <option key={bank} value={bank}>
-                  {bank}
-                </option>
-              ))}
-            </SelectField>
-            <div>
-              <span className="mb-2 block text-sm font-medium text-text-1">Account Type</span>
-              <div className="flex gap-6">
-                {["Savings", "Checking"].map((type) => (
-                  <label key={type} className="flex items-center gap-2 text-sm text-text-2">
-                    <input
-                      type="radio"
-                      name="accountType"
-                      value={type}
-                      checked={form.accountType === type}
-                      onChange={set("accountType")}
-                      className="accent-accent"
-                    />
-                    {type}
-                  </label>
-                ))}
-              </div>
-            </div>
+              {error && <p className="text-sm text-danger-vivid">{error}</p>}
 
-            <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-text-3">Security</p>
-            <TextField
-              label="Create PIN"
-              type="password"
-              inputMode="numeric"
-              maxLength={6}
-              value={form.pin}
-              onChange={set("pin")}
-              placeholder="••••"
-              help="4-6 digits. You'll use this instead of a password."
-              required
-            />
-            <TextField
-              label="Confirm PIN"
-              type="password"
-              inputMode="numeric"
-              maxLength={6}
-              value={form.confirmPin}
-              onChange={set("confirmPin")}
-              placeholder="••••"
-              required
-            />
-
-            <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-text-3">Verification</p>
-            <div>
-              <span className="mb-2 block text-sm font-medium text-text-1">Verify Your Phone</span>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={sendOtp}
-                disabled={countdown > 0}
-                className="px-4 py-2"
-              >
-                {countdown > 0 ? `Resend in ${countdown}s` : "Send OTP"}
+              <Button type="submit" disabled={submitting} className="w-full">
+                {submitting ? "Creating…" : "Create Account"}
               </Button>
-              {otpError && <p className="mt-2 text-xs text-danger-vivid">{otpError}</p>}
-              {otpSent && (
-                <TextField
-                  className="mt-3"
-                  value={form.otp}
-                  onChange={set("otp")}
-                  placeholder="000000"
-                  maxLength={6}
-                />
-              )}
-            </div>
 
-            <Checkbox
-              checked={agreed}
-              onChange={(e) => setAgreed(e.target.checked)}
-              required
-              label={
-                <>
-                  I agree to the <a href="#" className="text-accent">Terms of Service</a> and{" "}
-                  <a href="#" className="text-accent">Privacy Policy</a>
-                </>
-              }
-            />
+              <p className="text-center text-xs text-text-3">
+                You'll finish setting up your bank details and security afterward — no rush.
+              </p>
+            </form>
+          ) : (
+            <form onSubmit={handleVerify} className="flex flex-col gap-5">
+              <TextField
+                label="Verification Code"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                placeholder="000000"
+                maxLength={6}
+                autoFocus
+                required
+              />
 
-            {formError && <p className="text-sm text-danger-vivid">{formError}</p>}
+              {error && <p className="text-sm text-danger-vivid">{error}</p>}
 
-            <Button type="submit" disabled={submitting || !agreed} className="w-full">
-              {submitting ? "Creating…" : "Create Account"}
-            </Button>
-          </form>
+              <Button type="submit" disabled={submitting} className="w-full">
+                {submitting ? "Verifying…" : "Verify & Continue"}
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => setStep("form")}
+                className="text-center text-xs text-text-3 hover:text-text-1"
+              >
+                Wrong email? Go back
+              </button>
+            </form>
+          )}
 
           <p className="mt-5 text-center text-sm text-text-3">
             Already have an account?{" "}

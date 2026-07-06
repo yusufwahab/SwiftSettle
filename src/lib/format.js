@@ -7,3 +7,9 @@ const nairaFormatter = new Intl.NumberFormat("en-NG", {
 export function formatNaira(amount) {
   return nairaFormatter.format(amount);
 }
+
+export function maskAccountNumber(accountNumber) {
+  if (!accountNumber) return "";
+  const last4 = accountNumber.slice(-4);
+  return `**** **** ${last4}`;
+}

@@ -46,12 +46,14 @@ const env = {
   // virtual-account-creation and transfer calls.
   NOMBA_SUB_ACCOUNT_ID: optional("NOMBA_SUB_ACCOUNT_ID"),
 
-  TWILIO_ACCOUNT_SID: optional("TWILIO_ACCOUNT_SID"),
-  TWILIO_AUTH_TOKEN: optional("TWILIO_AUTH_TOKEN"),
-  TWILIO_PHONE_NUMBER: optional("TWILIO_PHONE_NUMBER"),
-
   PLATFORM_WEBHOOK_SECRET: optional("PLATFORM_WEBHOOK_SECRET"),
-  SENDGRID_API_KEY: optional("SENDGRID_API_KEY"),
+
+  // Brevo handles both signup email-OTP delivery and every other
+  // notification email. No Twilio/SendGrid anywhere anymore — auth moved
+  // from phone+OTP to email+password, so there's no SMS to send at all.
+  BREVO_API_KEY: optional("BREVO_API_KEY"),
+  BREVO_SENDER_EMAIL: optional("BREVO_SENDER_EMAIL", "notifications@swiftsettle.app"),
+  BREVO_SENDER_NAME: optional("BREVO_SENDER_NAME", "SwiftSettle"),
 
   // Not in BackendPrompt.md's env list — added because GET
   // /behavioral-analytics is explicitly "internal" (updatedPrompt.md) and
