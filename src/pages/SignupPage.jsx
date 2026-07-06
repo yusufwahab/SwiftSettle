@@ -7,16 +7,23 @@ import { nigerianBanks } from "../data/mockData";
 import { authService } from "../services";
 import { useAuth } from "../context/AuthContext";
 
+const platforms = ["Uber", "Bolt", "Jumia Food", "Glovo", "Chowdeck", "DoorDash", "Other"];
+const nigerianStates = [
+  "Lagos", "Abuja (FCT)", "Rivers", "Oyo", "Kano", "Kaduna", "Ogun", "Enugu", "Delta", "Edo",
+];
+
 const initialForm = {
   fullName: "",
   email: "",
   phone: "",
   dob: "",
+  state: "",
+  platform: "",
   accountNumber: "",
   bank: "",
   accountType: "Savings",
-  password: "",
-  confirmPassword: "",
+  pin: "",
+  confirmPin: "",
   otp: "",
 };
 
@@ -54,17 +61,28 @@ export default function SignupPage() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setFormError("");
-    if (form.password !== form.confirmPassword) {
-      setFormError("Passwords do not match.");
+    if (form.pin !== form.confirmPin) {
+      setFormError("PINs do not match.");
+      return;
+    }
+    if (!otpSent) {
+      setFormError("Verify your phone number first.");
       return;
     }
     setSubmitting(true);
     try {
       await completeSignup({
+        phone: form.phone,
+        otp: form.otp,
         fullName: form.fullName,
         email: form.email,
-        phone: form.phone,
+        dateOfBirth: form.dob,
+        state: form.state,
+        platform: form.platform,
         bank: { name: form.bank, accountNumber: form.accountNumber, accountHolder: form.fullName },
+        pin: form.pin,
+        dataSharingConsent: agreed,
+        termsAccepted: agreed,
       });
       navigate("/app/dashboard");
     } catch (err) {
@@ -96,6 +114,22 @@ export default function SignupPage() {
             <TextField label="Email Address" type="email" value={form.email} onChange={set("email")} placeholder="chioma@example.com" required />
             <TextField label="Phone Number" type="tel" value={form.phone} onChange={set("phone")} placeholder="+234 (0) 800 000 0000" required />
             <TextField label="Date of Birth" value={form.dob} onChange={set("dob")} placeholder="DD/MM/YYYY" required />
+            <SelectField label="State" value={form.state} onChange={set("state")} required>
+              <option value="">Select your state</option>
+              {nigerianStates.map((state) => (
+                <option key={state} value={state}>
+                  {state}
+                </option>
+              ))}
+            </SelectField>
+            <SelectField label="Platform" value={form.platform} onChange={set("platform")} required>
+              <option value="">Which platform do you work for?</option>
+              {platforms.map((platform) => (
+                <option key={platform} value={platform}>
+                  {platform}
+                </option>
+              ))}
+            </SelectField>
 
             <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-text-3">Bank details</p>
             <TextField
@@ -135,20 +169,24 @@ export default function SignupPage() {
 
             <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-text-3">Security</p>
             <TextField
-              label="Create Password"
+              label="Create PIN"
               type="password"
-              value={form.password}
-              onChange={set("password")}
-              placeholder="••••••••"
-              help="Minimum 8 characters, 1 uppercase, 1 number"
+              inputMode="numeric"
+              maxLength={6}
+              value={form.pin}
+              onChange={set("pin")}
+              placeholder="••••"
+              help="4-6 digits. You'll use this instead of a password."
               required
             />
             <TextField
-              label="Confirm Password"
+              label="Confirm PIN"
               type="password"
-              value={form.confirmPassword}
-              onChange={set("confirmPassword")}
-              placeholder="••••••••"
+              inputMode="numeric"
+              maxLength={6}
+              value={form.confirmPin}
+              onChange={set("confirmPin")}
+              placeholder="••••"
               required
             />
 

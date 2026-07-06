@@ -1,7 +1,7 @@
 // Single import surface for the rest of the app: `import { authService } from
-// "../services"`. Today API_MODE is always "mock". Pointing it at "live"
-// later means adding services/live/*.js with the same method names and
-// wiring them in below — pages never import from services/mock directly.
+// "../services"`. Set VITE_API_MODE=live (see .env.example) to switch from
+// the mock layer to the real backend — pages never import from
+// services/mock or services/live directly.
 
 import { API_MODE } from "../config/env";
 
@@ -13,6 +13,11 @@ import { supportService as mockSupportService } from "./mock/supportService";
 import { preferencesService as mockPreferencesService } from "./mock/preferencesService";
 import { notificationsService as mockNotificationsService } from "./mock/notificationsService";
 
+import { authService as liveAuthService } from "./live/authService";
+import { walletService as liveWalletService } from "./live/walletService";
+import { earningsService as liveEarningsService } from "./live/earningsService";
+import { settlementsService as liveSettlementsService } from "./live/settlementsService";
+
 const registry = {
   mock: {
     authService: mockAuthService,
@@ -23,7 +28,18 @@ const registry = {
     preferencesService: mockPreferencesService,
     notificationsService: mockNotificationsService,
   },
-  // live: { authService: liveAuthService, ... } — added when Nomba is wired up.
+  live: {
+    authService: liveAuthService,
+    walletService: liveWalletService,
+    earningsService: liveEarningsService,
+    settlementsService: liveSettlementsService,
+    // No backend exists for support/FAQ, notification-panel copy, or
+    // notification preferences in either prompt — live mode still reads
+    // this canned content rather than the app breaking outright.
+    supportService: mockSupportService,
+    preferencesService: mockPreferencesService,
+    notificationsService: mockNotificationsService,
+  },
 };
 
 const active = registry[API_MODE] || registry.mock;

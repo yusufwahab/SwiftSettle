@@ -1,0 +1,31 @@
+{
+  "name": "swiftsettle-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "SwiftSettle financial identity backend — Express + Supabase (Postgres) + Nomba + Twilio.",
+  "main": "server.js",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "test:health": "node src/utils/healthcheck.js"
+  },
+  "dependencies": {
+    "express": "^4.18.0",
+    "@supabase/supabase-js": "^2.39.0",
+    "dotenv": "^16.3.0",
+    "jsonwebtoken": "^9.0.2",
+    "twilio": "^6.0.2",
+    "axios": "^1.6.0",
+    "bcryptjs": "^2.4.3",
+    "joi": "^17.11.0",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "uuid": "^9.0.1",
+    "node-schedule": "^2.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  }
+}
