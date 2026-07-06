@@ -6,9 +6,10 @@ import Button from "./ui/dark/Button";
 import { Checkbox } from "./ui/dark/Field";
 import { formatNaira } from "../lib/format";
 import { walletService } from "../services";
-import { currentWorker } from "../data/mockData";
+import { useAuth } from "../context/AuthContext";
 
 export default function SettlementModal({ open, onClose, balance, onSettled }) {
+  const { worker } = useAuth();
   const [confirmed, setConfirmed] = useState(false);
   const [status, setStatus] = useState("idle"); // idle | loading | success | error
   const [result, setResult] = useState(null);
@@ -108,9 +109,9 @@ export default function SettlementModal({ open, onClose, balance, onSettled }) {
             <Building2 className="h-4 w-4" strokeWidth={1.75} />
           </span>
           <div>
-            <p className="text-sm font-medium text-text-1">{currentWorker.bank.name}</p>
+            <p className="text-sm font-medium text-text-1">{worker?.bank?.name || "No bank on file"}</p>
             <p className="text-xs text-text-3">
-              {currentWorker.bank.accountNumberMasked} · {currentWorker.bank.accountHolder}
+              {worker?.bank?.accountNumberMasked} · {worker?.bank?.accountHolder}
             </p>
           </div>
         </label>

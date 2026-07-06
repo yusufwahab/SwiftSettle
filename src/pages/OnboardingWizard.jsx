@@ -1,11 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "../components/layout/AppLayout";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/dark/Button";
 import { TextField, SelectField, Checkbox, Toggle } from "../components/ui/dark/Field";
-import { nigerianBanks } from "../data/mockData";
-import { onboardingService } from "../services";
+import { onboardingService, banksService } from "../services";
 import { useAuth } from "../context/AuthContext";
 
 const platforms = ["Uber", "Bolt", "Jumia Food", "Glovo", "Chowdeck", "DoorDash", "Other"];
@@ -27,9 +26,34 @@ export default function OnboardingWizard() {
   const [error, setError] = useState("");
 
   const [personal, setPersonal] = useState({ date_of_birth: "", state: "", platform: "", phone_number: "" });
-  const [bank, setBank] = useState({ bank_name: "", account_number: "", account_holder_name: worker?.fullName || "" });
+  const [bank, setBank] = useState({ bank_name: "", bank_code: "", account_number: "", account_holder_name: worker?.fullName || "" });
   const [security, setSecurity] = useState({ pin: "", confirmPin: "", two_factor_enabled: false });
   const [consent, setConsent] = useState({ data_sharing_consent: false, terms_accepted: false });
+
+  const [banks, setBanks] = useState([]);
+  const [banksLoading, setBanksLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setBanksLoading(true);
+    banksService
+      .list()
+      .then((result) => {
+        if (!cancelled) setBanks(result);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setBanksLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleBankChange = (e) => {
+    const selected = banks.find((b) => b.code === e.target.value);
+    setBank((f) => ({ ...f, bank_name: selected?.name || "", bank_code: e.target.value }));
+  };
 
   const goToDashboard = () => navigate("/app/dashboard");
 
@@ -152,14 +176,14 @@ export default function OnboardingWizard() {
             <form onSubmit={handleBankSubmit} className="flex flex-col gap-5">
               <SelectField
                 label="Select Your Bank"
-                value={bank.bank_name}
-                onChange={(e) => setBank((f) => ({ ...f, bank_name: e.target.value }))}
+                value={bank.bank_code}
+                onChange={handleBankChange}
                 required
               >
-                <option value="">Choose your bank</option>
-                {nigerianBanks.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
+                <option value="">{banksLoading ? "Loading banks…" : "Choose your bank"}</option>
+                {banks.map((b) => (
+                  <option key={b.code} value={b.code}>
+                    {b.name}
                   </option>
                 ))}
               </SelectField>

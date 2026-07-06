@@ -8,5 +8,6 @@ router.use(requireAuth);
 router.get("/balance", earningsController.getBalance);
 router.get("/history", earningsController.getHistory);
 router.get("/daily", earningsController.getDaily);
+router.post("/simulate", earningsController.simulateEarning);
 
 module.exports = router;

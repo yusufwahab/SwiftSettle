@@ -1,4 +1,6 @@
 const supabase = require("../config/database");
+const platformService = require("../services/platformService");
+const { generateReference } = require("../utils/helpers");
 
 async function getBalance(req, res, next) {
   try {
@@ -87,4 +89,33 @@ async function getDaily(req, res, next) {
   }
 }
 
-module.exports = { getBalance, getHistory, getDaily };
+// POST /api/earnings/simulate
+// There's no real gig-platform partner wired up yet — nothing calls
+// POST /webhooks/platform for real orders. Rather than requiring a
+// developer to hand-insert `earnings` rows in Supabase for every worker who
+// wants to see the settlement flow work, any logged-in worker can trigger
+// this themselves to record one simulated completed delivery on their own
+// account. Goes through the exact same platformService.recordEarning() path
+// a real platform webhook would, so balance/behavioral-data updates stay
+// consistent with the real flow — this is a different entry point into the
+// same logic, not a shortcut around it.
+async function simulateEarning(req, res, next) {
+  try {
+    const worker = req.worker;
+    const amount = Number(req.body?.amount) || Math.round((800 + Math.random() * 2200) / 50) * 50;
+
+    await platformService.recordEarning({
+      workerId: worker.id,
+      platform: worker.platform || "Demo Platform",
+      orderId: generateReference("DEMO"),
+      amount,
+      description: "Simulated delivery (demo)",
+    });
+
+    res.json({ simulated: true, amount });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { getBalance, getHistory, getDaily, simulateEarning };

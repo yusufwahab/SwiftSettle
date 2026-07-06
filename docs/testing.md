@@ -78,16 +78,28 @@ Supabase for the new row.
 Or step through it one at a time via `/auth/verify-phone-update` (see
 `docs/api/reference.md` for what each of steps 1-4 expects).
 
-## 5. Simulate a platform webhook (earnings)
+## 5. Get an earning onto the account
 
-Compute the HMAC yourself to match `PLATFORM_WEBHOOK_SECRET`:
+Two ways, depending on what you're testing:
+
+**a) Quick/self-service (any logged-in worker, no signature needed):**
+```bash
+curl -X POST $API/earnings/simulate -H "Authorization: Bearer $TOKEN"
+# { "simulated": true, "amount": 1850 }
+```
+This is what the Dashboard's "+ Simulate Delivery (Demo)" button calls. Use
+this for everyday testing/demo — it's the only realistic way to get a
+non-zero balance until a real gig-platform partner is integrated.
+
+**b) Testing the real platform-webhook path itself** (signature
+verification, idempotency) — this is what you'd actually be testing if a
+platform partner's integration were misbehaving:
 ```bash
 BODY='{"order_id":"ORDER-001","worker_id":"<paste worker_id>","amount":1500,"platform":"Uber"}'
 SIG=$(echo -n "$BODY" | openssl dgst -sha256 -hmac "$PLATFORM_WEBHOOK_SECRET" | sed 's/^.* //')
 curl -X POST $API/webhooks/platform -H "Content-Type: application/json" \
   -H "x-platform-signature: $SIG" -d "$BODY"
 ```
-
 Redeliver the exact same body/signature a second time and confirm the
 response comes back `{ "received": true, "duplicate": true }` — that's the
 idempotency guarantee working.

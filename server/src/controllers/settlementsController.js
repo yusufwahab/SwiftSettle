@@ -23,7 +23,7 @@ async function createSettlement(req, res, next) {
     if (amount > available) {
       throw new ApiError(422, "insufficient_balance", `Available balance is only ₦${available.toLocaleString()}.`);
     }
-    if (!worker.bank_verified || !worker.account_number) {
+    if (!worker.bank_verified || !worker.account_number || !worker.bank_code) {
       throw new ApiError(422, "no_bank_account", "Add a verified bank account before settling.");
     }
 
@@ -47,7 +47,7 @@ async function createSettlement(req, res, next) {
         amount,
         accountNumber: worker.account_number,
         accountName: worker.account_holder_name,
-        bankCode: worker.bank_name,
+        bankCode: worker.bank_code,
         reference,
         narration: "SwiftSettle earnings settlement",
       });

@@ -87,10 +87,14 @@ not `localhost`. Two ways to get one:
 
 For the form itself: the **sub-account ID** field is exactly the
 `NOMBA_SUB_ACCOUNT_ID` value from your credentials — submit it as given.
-The dashboard webhook setup (a separate step from that form, per Nomba's
-docs) also asks you to choose a **signature key** — that's what becomes
-`NOMBA_WEBHOOK_SECRET` in your `.env`. You choose that value yourself (a
-long random string); it isn't something Nomba generates for you.
+
+**Signature key / `NOMBA_WEBHOOK_SECRET`:** this depends on how you're
+integrated with Nomba. For a standalone merchant integration, you choose
+this value yourself and enter it as the "signature key" in Nomba's
+dashboard. **If you're on the NombaHackathon2026 program specifically,
+Nomba assigns this to you as a fixed value** — it's shown directly on
+their webhook-submission form (e.g. `NombaHackathon2026`). Use exactly
+what they show you in that case, don't invent your own.
 
 ## Deployment (Render/Railway)
 

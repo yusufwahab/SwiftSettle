@@ -100,7 +100,7 @@ async function requestCredit(req, res, next) {
       amount,
       accountNumber: worker.account_number,
       accountName: worker.account_holder_name,
-      bankCode: worker.bank_name,
+      bankCode: worker.bank_code,
       narration: "SwiftSettle credit disbursement",
     });
     repaymentPlan.disbursement_transfer_id = disbursement.nombaTransferId;

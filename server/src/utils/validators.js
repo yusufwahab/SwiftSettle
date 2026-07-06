@@ -40,6 +40,10 @@ const schemas = {
     platform: Joi.string().required(),
     phone_number: phoneSchema.required(),
     bank_name: Joi.string().required(),
+    bank_code: Joi.string()
+      .pattern(/^[0-9]{3}([0-9]{3})?$/)
+      .required()
+      .messages({ "string.pattern.base": "bankCode must be exactly 3 or 6 digits." }),
     account_number: Joi.string().required(),
     account_holder_name: Joi.string().required(),
     pin: Joi.string().pattern(/^[0-9]{4,6}$/).required(),

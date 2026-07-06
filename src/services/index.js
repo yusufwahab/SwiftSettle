@@ -13,12 +13,14 @@ import { supportService as mockSupportService } from "./mock/supportService";
 import { preferencesService as mockPreferencesService } from "./mock/preferencesService";
 import { notificationsService as mockNotificationsService } from "./mock/notificationsService";
 import { onboardingService as mockOnboardingService } from "./mock/onboardingService";
+import { banksService as mockBanksService } from "./mock/banksService";
 
 import { authService as liveAuthService } from "./live/authService";
 import { walletService as liveWalletService } from "./live/walletService";
 import { earningsService as liveEarningsService } from "./live/earningsService";
 import { settlementsService as liveSettlementsService } from "./live/settlementsService";
 import { onboardingService as liveOnboardingService } from "./live/onboardingService";
+import { banksService as liveBanksService } from "./live/banksService";
 
 const registry = {
   mock: {
@@ -30,6 +32,7 @@ const registry = {
     preferencesService: mockPreferencesService,
     notificationsService: mockNotificationsService,
     onboardingService: mockOnboardingService,
+    banksService: mockBanksService,
   },
   live: {
     authService: liveAuthService,
@@ -37,6 +40,7 @@ const registry = {
     earningsService: liveEarningsService,
     settlementsService: liveSettlementsService,
     onboardingService: liveOnboardingService,
+    banksService: liveBanksService,
     // No backend exists for support/FAQ, notification-panel copy, or
     // notification preferences in either prompt — live mode still reads
     // this canned content rather than the app breaking outright.
@@ -56,3 +60,4 @@ export const supportService = active.supportService;
 export const preferencesService = active.preferencesService;
 export const notificationsService = active.notificationsService;
 export const onboardingService = active.onboardingService;
+export const banksService = active.banksService;

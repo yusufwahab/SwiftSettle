@@ -63,4 +63,19 @@ async function transferToBank({ amount, accountNumber, accountName, bankCode, re
   };
 }
 
-module.exports = { createVirtualAccount, transferToBank };
+// GET /v1/transfers/banks
+// Returns a plain array of [{ name, code }] (not wrapped in a `results`
+// field — confirmed against the real sandbox response). Nomba's docs note
+// bank codes rarely change, so this is cached in memory for the life of the
+// process rather than hitting Nomba on every request.
+let cachedBankList = null;
+
+async function getBankList() {
+  if (cachedBankList) return cachedBankList;
+
+  const response = await nombaRequest({ method: "GET", url: "/v1/transfers/banks" });
+  cachedBankList = response.data;
+  return cachedBankList;
+}
+
+module.exports = { createVirtualAccount, transferToBank, getBankList };

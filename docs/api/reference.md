@@ -89,6 +89,15 @@ GET /earnings/history?limit=20&offset=0&start_date=2026-06-01&end_date=2026-07-0
 
 GET /earnings/daily
   -> { daily_breakdown: { "2026-07-04": 4500, "2026-07-05": 3800, ... } }
+
+POST /earnings/simulate
+  -> { simulated: true, amount }
+  Records one simulated completed delivery on the caller's own account, via
+  the same platformService.recordEarning() path a real platform webhook
+  would use. Exists because no real gig-platform partner is integrated yet —
+  without this, the only way to get a non-zero balance to settle would be a
+  developer manually inserting rows in Supabase. Optional body: { amount }
+  (defaults to a randomized realistic single-delivery amount, ₦800-₦3000).
 ```
 
 ## Settlements

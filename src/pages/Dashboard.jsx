@@ -28,11 +28,30 @@ const notifTone = {
 export default function Dashboard() {
   const { worker } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
+  const [simulating, setSimulating] = useState(false);
+  const [simulateError, setSimulateError] = useState("");
   const balanceState = useAsync(() => walletService.getBalance(), []);
   const activityState = useAsync(() => walletService.getTodayActivity(), []);
   const paymentState = useAsync(() => walletService.getPaymentMethod(), []);
   const weeklyState = useAsync(() => earningsService.getWeekly(), []);
   const notifState = useAsync(() => notificationsService.list(), []);
+
+  // No real gig-platform partner is wired up yet, so nothing ever records a
+  // real earning on its own. This lets any onboarded worker add one
+  // themselves — no developer/SQL required — then refreshes the views that
+  // would change as a result.
+  const handleSimulateDelivery = async () => {
+    setSimulateError("");
+    setSimulating(true);
+    try {
+      await earningsService.simulate();
+      await Promise.all([balanceState.reload(), activityState.reload(), weeklyState.reload()]);
+    } catch (err) {
+      setSimulateError(err.message);
+    } finally {
+      setSimulating(false);
+    }
+  };
 
   return (
     <AppLayout title="Dashboard" breadcrumb="Overview" rightRail={<RightRail notifState={notifState} />}>
@@ -72,7 +91,18 @@ export default function Dashboard() {
 
       <div className="mt-5 grid gap-5 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <p className="mb-2 text-sm font-bold text-text-1">Today's Activity</p>
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-sm font-bold text-text-1">Today's Activity</p>
+            <button
+              type="button"
+              onClick={handleSimulateDelivery}
+              disabled={simulating}
+              className="text-xs text-accent hover:text-accent-dark disabled:opacity-50"
+            >
+              {simulating ? "Adding…" : "+ Simulate Delivery (Demo)"}
+            </button>
+          </div>
+          {simulateError && <p className="mb-2 text-xs text-danger-vivid">{simulateError}</p>}
           {activityState.status === "loading" && (
             <div className="space-y-3 py-3">
               <Skeleton className="h-5" />

@@ -85,4 +85,14 @@ export const earningsService = {
   async getPerformance() {
     return { ...mockPerformanceMetrics };
   },
+
+  // No real gig-platform partner is wired up yet — nothing ever calls
+  // POST /webhooks/platform for a real order. This lets a logged-in worker
+  // record one simulated completed delivery on their own account (via
+  // POST /earnings/simulate, which goes through the same recordEarning()
+  // path a real webhook would) instead of a developer hand-inserting rows
+  // in Supabase for every worker who wants to see the settlement flow work.
+  async simulate() {
+    return apiRequest("/earnings/simulate", { method: "POST" });
+  },
 };

@@ -160,6 +160,7 @@ async function applyOnboardingStep(worker, step, data) {
   if (step === 2) {
     Object.assign(updates, {
       bank_name: data.bank_name,
+      bank_code: data.bank_code,
       account_number: data.account_number,
       account_holder_name: data.account_holder_name,
       bank_verified: true,
