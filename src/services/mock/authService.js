@@ -64,6 +64,10 @@ export const authService = {
     );
   },
 
+  async becomeAdmin() {
+    return simulate({ isAdmin: true }, { delay: 400 });
+  },
+
   async logout() {
     return simulate({ ok: true }, { delay: 200 });
   },

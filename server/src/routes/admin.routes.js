@@ -6,8 +6,10 @@ const router = express.Router();
 
 // Simple shared-secret gate — there's no worker JWT to check here, this is
 // an internal endpoint (updatedPrompt.md: "Internal endpoint for credit
-// calculation"). No admin UI exists or is planned (per the prompt's
-// explicit "don't create admin UI" instruction) — this is API-only.
+// calculation"), API-only, no UI. Distinct from the payout-request admin
+// flow added later (see routes/payouts.routes.js), which *does* have a real
+// UI (AdminPayoutsPage) gated by workers.is_admin on a normal JWT session —
+// that's a different admin concept from this shared-secret one.
 router.use((req, res, next) => {
   const key = req.headers["x-admin-key"];
   if (!env.ADMIN_API_KEY || key !== env.ADMIN_API_KEY) {

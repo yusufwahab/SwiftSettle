@@ -50,6 +50,7 @@ export default function Dashboard() {
   const weeklyState = useAsync(() => earningsService.getWeekly(), []);
   const notifState = useAsync(() => notificationsService.list(), []);
   const scoreState = useAsync(() => financialService.getScore(), []);
+  const payoutsState = useAsync(() => payoutsService.mine(), []);
 
   // No real gig-platform partner is wired up yet, so nothing ever records a
   // real earning on its own. This lets any onboarded worker add one
@@ -79,7 +80,7 @@ export default function Dashboard() {
     setRequestingPayout(true);
     try {
       await payoutsService.request();
-      await activityState.reload();
+      await Promise.all([activityState.reload(), payoutsState.reload()]);
     } catch (err) {
       setPayoutError(err.message);
     } finally {
@@ -91,6 +92,15 @@ export default function Dashboard() {
     <AppLayout title="Dashboard" breadcrumb="Overview" rightRail={<RightRail notifState={notifState} />}>
       {!worker?.onboardingCompletedAt && <OnboardingNudge step={worker?.onboardingStep} />}
       <BalanceCard state={balanceState} onSettle={() => setModalOpen(true)} />
+
+      <PayoutRequestsCard
+        payoutsState={payoutsState}
+        pendingOrders={pendingOrders}
+        pendingTotal={pendingTotal}
+        onRequestPayout={handleRequestPayout}
+        requesting={requestingPayout}
+        error={payoutError}
+      />
 
       <div className="mt-5">
         <FinancialScoreCard state={scoreState} compact />
@@ -144,23 +154,6 @@ export default function Dashboard() {
             </button>
           </div>
           {simulateError && <p className="mb-2 text-xs text-danger-vivid">{simulateError}</p>}
-          {pendingOrders.length > 0 && (
-            <div className="mb-3 flex items-center justify-between gap-3 rounded-xl bg-accent/8 p-3">
-              <p className="text-xs text-text-2">
-                {pendingOrders.length} order{pendingOrders.length === 1 ? "" : "s"} worth{" "}
-                {formatNaira(pendingTotal)} awaiting payout
-              </p>
-              <Button
-                variant="subtle"
-                onClick={handleRequestPayout}
-                disabled={requestingPayout}
-                className="shrink-0 px-3 py-1.5 text-xs"
-              >
-                {requestingPayout ? "Requesting…" : "Request Payout"}
-              </Button>
-            </div>
-          )}
-          {payoutError && <p className="mb-2 text-xs text-danger-vivid">{payoutError}</p>}
           {activityState.status === "loading" && (
             <div className="space-y-3 py-3">
               <Skeleton className="h-5" />
@@ -279,6 +272,72 @@ function OnboardingNudge({ step }) {
       <Button as={Link} to="/app/onboarding" className="shrink-0 px-5 py-2.5">
         Continue Setup <ArrowRight className="h-4 w-4" strokeWidth={1.75} />
       </Button>
+    </Card>
+  );
+}
+
+// Always visible (unlike a conditional banner buried in another card) so
+// the worker-requests → admin-processes flow has one obvious home instead
+// of only appearing once you already have a pending order.
+function PayoutRequestsCard({ payoutsState, pendingOrders, pendingTotal, onRequestPayout, requesting, error }) {
+  const openRequest = payoutsState.data?.find((r) => r.status === "requested");
+  const lastProcessed = payoutsState.data?.find((r) => r.status !== "requested");
+
+  return (
+    <Card className="mt-5 border border-accent/20">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-bold text-text-1">Payout Requests</p>
+        <Link to="/app/earnings" className="text-xs text-accent hover:text-accent-dark">
+          View history →
+        </Link>
+      </div>
+
+      {payoutsState.status === "loading" && <Skeleton className="mt-3 h-14" />}
+      {payoutsState.status === "error" && (
+        <ErrorState message={payoutsState.error} onRetry={payoutsState.reload} className="py-4" />
+      )}
+
+      {payoutsState.status === "success" && (
+        <div className="mt-3">
+          {openRequest ? (
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-accent/8 p-3">
+              <p className="text-sm text-text-2">
+                Payout request of {formatNaira(openRequest.requested_total)} sent — awaiting admin review.
+              </p>
+              <Badge tone="primary">requested</Badge>
+            </div>
+          ) : pendingOrders.length > 0 ? (
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-accent/8 p-3">
+              <p className="text-sm text-text-2">
+                {pendingOrders.length} completed order{pendingOrders.length === 1 ? "" : "s"} worth{" "}
+                {formatNaira(pendingTotal)} ready to request.
+              </p>
+              <Button
+                variant="success"
+                onClick={onRequestPayout}
+                disabled={requesting}
+                className="shrink-0 px-4 py-2 text-sm"
+              >
+                {requesting ? "Requesting…" : "Request Payout"}
+              </Button>
+            </div>
+          ) : (
+            <EmptyState
+              title="No completed orders yet"
+              message="Simulate a delivery below, then come back here to request payout — that's what alerts the admin to pay you."
+              className="py-6"
+            />
+          )}
+          {error && <p className="mt-2 text-xs text-danger-vivid">{error}</p>}
+          {lastProcessed && (
+            <p className="mt-3 text-xs text-text-3">
+              Last payout: {formatNaira(lastProcessed.received_amount)} received of{" "}
+              {formatNaira(lastProcessed.requested_total)} requested —{" "}
+              <span className="font-medium text-text-2">{lastProcessed.status}</span>
+            </p>
+          )}
+        </div>
+      )}
     </Card>
   );
 }

@@ -283,6 +283,27 @@ async function getMe(req, res, next) {
   }
 }
 
+// POST /auth/become-admin — self-service demo toggle. Every new signup
+// starts as a regular worker (workers.is_admin defaults false, per
+// migration 20260707000002); this build has no separate admin signup flow
+// by design ("everything inside one account"), so anyone trying the app
+// fresh — including a judge — can flip their own account to admin without
+// needing direct database access.
+async function becomeAdmin(req, res, next) {
+  try {
+    const { data: worker, error } = await supabase
+      .from("workers")
+      .update({ is_admin: true })
+      .eq("id", req.worker.id)
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ worker: sanitizeWorker(worker) });
+  } catch (err) {
+    next(err);
+  }
+}
+
 function sanitizeWorker(worker) {
   // eslint-disable-next-line no-unused-vars
   const { pin_hash, password_hash, platform_access_token, ...safe } = worker;
@@ -298,5 +319,6 @@ module.exports = {
   refreshToken,
   logout,
   getMe,
+  becomeAdmin,
   sanitizeWorker,
 };
