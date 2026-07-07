@@ -40,11 +40,17 @@ export const walletService = {
       `/earnings/history?start_date=${today}&limit=50`,
       { method: "GET" }
     );
+    // `amount` is what the platform claimed the order was worth; once
+    // reconciled, `received_amount` is what Nomba actually confirmed landed
+    // in the VA — they can differ (under/overpayment), so both are exposed
+    // rather than collapsing to one number.
     return (earnings || []).map((row) => ({
       id: row.id,
       label: row.description || "Earnings recorded",
       time: new Date(row.recorded_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
       amount: Number(row.amount),
+      receivedAmount: row.received_amount != null ? Number(row.received_amount) : null,
+      status: row.status,
     }));
   },
 

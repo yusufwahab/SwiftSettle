@@ -1,21 +1,36 @@
 const supabase = require("../config/database");
 const platformService = require("../services/platformService");
 const scoringService = require("../services/scoringService");
+const reconciliationService = require("../services/reconciliationService");
 const logger = require("../utils/logger");
 
 // POST /api/webhooks/nomba
 // Handles the real Nomba event set (verified against developer.nomba.com):
 // payout_success / payout_failed confirm a settlement's outcome;
-// payment_success / payment_reversal / payout_refund are acknowledged but
-// not acted on yet (nothing in this codebase deposits into a worker's
-// virtual account independent of a platform-reported earning, so there's
-// no handler logic to attach to them yet — flagged rather than guessed at).
+// payment_success confirms a deposit into a worker's dedicated virtual
+// account and runs it through reconciliationService (matches against the
+// oldest pending platform-reported order, handles exact/under/overpayment).
+// payment_reversal / payout_refund are acknowledged but not acted on yet.
 async function handleNombaWebhook(req, res, next) {
   try {
     const { event_type: eventType, data } = req.body;
     const transactionId = data?.transaction?.transactionId;
 
-    if (eventType === "payout_success" || eventType === "payout_failed") {
+    if (eventType === "payment_success") {
+      const workerId = reconciliationService.workerIdFromAccountRef(data?.transaction?.aliasAccountReference);
+      if (!workerId) {
+        logger.warn("payment_success webhook with unrecognized aliasAccountReference", {
+          aliasAccountReference: data?.transaction?.aliasAccountReference,
+        });
+        return res.status(200).json({ received: true });
+      }
+
+      await reconciliationService.reconcileDeposit({
+        workerId,
+        receivedAmount: Number(data.transaction.transactionAmount),
+        nombaTransactionId: transactionId,
+      });
+    } else if (eventType === "payout_success" || eventType === "payout_failed") {
       const { data: settlement } = await supabase
         .from("settlements")
         .select("*")

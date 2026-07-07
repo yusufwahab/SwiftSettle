@@ -41,6 +41,9 @@ export const currentWorker = {
   twoFactorEnabled: false,
   onboardingStep: 4,
   onboardingCompletedAt: "2026-06-01T09:00:00.000Z",
+  // Mock mode is a dev/demo fallback, not a real security boundary — flagged
+  // true so the Admin page is reachable without extra setup while exploring.
+  isAdmin: true,
 };
 
 export const balanceSummary = {

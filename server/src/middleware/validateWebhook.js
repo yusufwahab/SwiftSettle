@@ -17,18 +17,13 @@ function timingSafeEqual(a, b) {
 //
 // headers: nomba-signature, nomba-signature-algorithm (HmacSHA256),
 // nomba-signature-version (1.0.0), nomba-timestamp (RFC-3339).
-function validateNombaWebhook(req, res, next) {
-  const signature = req.headers["nomba-signature"];
-  const timestamp = req.headers["nomba-timestamp"];
-
-  if (!signature || !timestamp) {
-    return res.status(401).json({ error: "invalid_signature", message: "Missing Nomba signature headers." });
-  }
-  if (!env.NOMBA_WEBHOOK_SECRET) {
-    return res.status(500).json({ error: "webhook_not_configured", message: "NOMBA_WEBHOOK_SECRET is not set." });
-  }
-
-  const body = req.body || {};
+// Shared by both the inbound signature check below and
+// earningsController.simulateCustomerPayment (which builds a synthetic
+// event using this exact same scheme + our own NOMBA_WEBHOOK_SECRET, then
+// sends it through the real /webhooks/nomba endpoint — a legitimate
+// self-test pattern, not a bypass, since that secret is the one Nomba
+// itself signs with).
+function computeNombaSignature(body, timestamp, secret) {
   const merchant = body.data?.merchant || {};
   const transaction = body.data?.transaction || {};
 
@@ -46,10 +41,21 @@ function validateNombaWebhook(req, res, next) {
     .map((v) => v ?? "")
     .join(":");
 
-  const expected = crypto
-    .createHmac("sha256", env.NOMBA_WEBHOOK_SECRET)
-    .update(signedString)
-    .digest("base64");
+  return crypto.createHmac("sha256", secret).update(signedString).digest("base64");
+}
+
+function validateNombaWebhook(req, res, next) {
+  const signature = req.headers["nomba-signature"];
+  const timestamp = req.headers["nomba-timestamp"];
+
+  if (!signature || !timestamp) {
+    return res.status(401).json({ error: "invalid_signature", message: "Missing Nomba signature headers." });
+  }
+  if (!env.NOMBA_WEBHOOK_SECRET) {
+    return res.status(500).json({ error: "webhook_not_configured", message: "NOMBA_WEBHOOK_SECRET is not set." });
+  }
+
+  const expected = computeNombaSignature(req.body || {}, timestamp, env.NOMBA_WEBHOOK_SECRET);
 
   if (!timingSafeEqual(expected, signature)) {
     return res.status(401).json({ error: "invalid_signature", message: "Nomba webhook signature check failed." });
@@ -80,4 +86,4 @@ function validatePlatformWebhook(req, res, next) {
   next();
 }
 
-module.exports = { validateNombaWebhook, validatePlatformWebhook };
+module.exports = { validateNombaWebhook, validatePlatformWebhook, computeNombaSignature };

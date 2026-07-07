@@ -10,5 +10,7 @@ router.use("/credit", require("./credit.routes"));
 router.use("/webhooks", require("./webhooks.routes"));
 router.use("/admin", require("./admin.routes"));
 router.use("/banks", require("./banks.routes"));
+router.use("/payouts", require("./payouts.routes"));
+router.use("/notifications", require("./notifications.routes"));
 
 module.exports = router;

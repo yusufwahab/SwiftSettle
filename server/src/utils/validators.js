@@ -57,10 +57,23 @@ const schemas = {
 
   creditRequest: Joi.object({ amount: Joi.number().positive().required() }),
 
+  // Nomba's real webhook payload field is `event_type` (confirmed against
+  // developer.nomba.com), not `event` — this previously required a field
+  // that never arrives, which would have 400'd every real webhook before
+  // handleNombaWebhook ever ran.
   nombaWebhook: Joi.object({
-    event: Joi.string().required(),
+    event_type: Joi.string().required(),
     data: Joi.object().required(),
   }).unknown(true),
+
+  simulatePayment: Joi.object({
+    amount: Joi.number().positive().optional(),
+    earning_id: Joi.string().uuid().optional(),
+  }),
+
+  processPayout: Joi.object({
+    amount: Joi.number().positive().required(),
+  }),
 
   platformWebhook: Joi.object({
     order_id: Joi.string().required(),

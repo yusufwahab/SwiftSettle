@@ -64,6 +64,19 @@ const notifications = {
       "Daily repayment deducted",
       `<p>Daily credit repayment: ₦${amount.toLocaleString()} deducted from today's settlement.</p>`
     ),
+
+  payoutProcessed: (email, { status, expected, received }) => {
+    const statusCopy = {
+      matched: "in full",
+      underpaid: `partially — ₦${received.toLocaleString()} of the ₦${expected.toLocaleString()} requested`,
+      overpaid: `in excess — ₦${received.toLocaleString()} against the ₦${expected.toLocaleString()} requested`,
+    };
+    return send(
+      email,
+      "Your payout has been processed",
+      `<p>Your payout request has been processed ${statusCopy[status] || ""}.</p><p>Amount received: ₦${received.toLocaleString()}.</p>`
+    );
+  },
 };
 
 module.exports = { send, sendOtpEmail, notifications };

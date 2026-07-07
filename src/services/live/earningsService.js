@@ -95,4 +95,17 @@ export const earningsService = {
   async simulate() {
     return apiRequest("/earnings/simulate", { method: "POST" });
   },
+
+  // Step 2 of the demo flow — simulates the actual payment landing in the
+  // worker's Nomba virtual account (see server/src/controllers/
+  // earningsController.js's simulateCustomerPayment for why this can't just
+  // be a real Nomba sandbox deposit). Passing an amount that differs from
+  // the pending order's expected amount is how under/overpayment gets
+  // demonstrated, not a misuse of the endpoint.
+  async simulatePayment({ amount, earningId } = {}) {
+    return apiRequest("/earnings/simulate-payment", {
+      method: "POST",
+      body: { amount, earning_id: earningId },
+    });
+  },
 };

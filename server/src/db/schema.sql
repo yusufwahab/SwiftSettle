@@ -1,8 +1,4 @@
--- Consolidated schema for one-shot paste into the Supabase SQL editor.
--- Generated from supabase/migrations/*.sql (that folder is the source of
--- truth — if the two ever diverge, trust the migrations). Also runnable
--- via the Supabase CLI (`supabase db push`) from the migrations folder
--- directly instead of pasting this file.
+-- Consolidated schema, regenerated from supabase/migrations/*.sql — do not edit directly.
 
 -- 20260706000001_schema.sql
 --
@@ -295,3 +291,94 @@ alter table workers
   add column if not exists bank_code varchar;
 
 comment on column workers.bank_code is 'Numeric CBN bank code (3 or 6 digits) from Nomba''s GET /v1/transfers/banks — required by the Transfer API. Distinct from bank_name, which is just the display name.';
+-- 20260707000001_earnings_reconciliation.sql
+--
+-- Turns `earnings` from "instantly-credited claims" into a real two-step
+-- reconciliation ledger, matching how a dedicated virtual account actually
+-- works: a platform reports an order (pending, amount = expected), then
+-- Nomba's payment_success webhook confirms what actually landed in the
+-- worker's VA (received_amount, which may differ from the expected amount).
+-- Balance/behavioral/income calculations move from `amount` to
+-- `received_amount` on reconciled rows only — unreconciled claims no longer
+-- count as real money.
+
+alter table earnings
+  add column if not exists status varchar not null default 'pending', -- pending | matched | underpaid | overpaid | unmatched
+  add column if not exists received_amount decimal,
+  add column if not exists nomba_transaction_id varchar unique,
+  add column if not exists reconciled_at timestamp;
+
+-- Every row that existed before this migration was credited under the old
+-- "claim = money" model (either a real platform webhook or the demo
+-- Simulate Delivery button) — grandfather them in as already-reconciled so
+-- existing balances don't change retroactively.
+update earnings
+  set status = 'matched', received_amount = amount, reconciled_at = recorded_at
+  where status = 'pending';
+
+create index if not exists idx_earnings_worker_status on earnings(worker_id, status);
+
+comment on column earnings.status is 'pending (awaiting VA deposit) | matched | underpaid | overpaid | unmatched (deposit with no matching pending order)';
+comment on column earnings.received_amount is 'Actual amount confirmed via Nomba''s payment_success webhook — distinct from amount (what the platform claimed the order was worth).';
+comment on column earnings.nomba_transaction_id is 'Nomba transaction ID from the payment_success webhook — unique, makes reconciliation idempotent against webhook retries.';
+-- 20260707000002_payout_requests_and_notifications.sql
+--
+-- Adds the worker-initiated payout request flow and an admin role to
+-- process it. A worker bundles their currently-pending earnings into one
+-- payout_request; an admin (a worker account flagged is_admin, no separate
+-- login system) processes it with an amount that can deliberately differ
+-- from what was requested — the same matched/underpaid/overpaid/unmatched
+-- vocabulary as direct VA reconciliation, just triggered by an admin action
+-- instead of an organic deposit. Also adds a real in-app notifications
+-- table (previously 100% mocked even in live mode).
+
+alter table workers
+  add column if not exists is_admin boolean not null default false;
+
+create table if not exists payout_requests (
+  id uuid primary key default uuid_generate_v4(),
+  worker_id uuid references workers(id) not null,
+  requested_total decimal not null,
+  status varchar not null default 'requested', -- requested | matched | underpaid | overpaid
+  received_amount decimal,
+  nomba_transaction_id varchar unique,
+  processed_by uuid references workers(id),
+  requested_at timestamp default now(),
+  processed_at timestamp
+);
+
+create index if not exists idx_payout_requests_worker on payout_requests(worker_id);
+create index if not exists idx_payout_requests_status on payout_requests(status);
+
+-- Earnings bundled into a payout_request move to status='requested' (still
+-- not counted as real balance) until the request resolves, at which point
+-- each bundled earning's received_amount/status is set pro-rata against the
+-- request's actual received_amount — keeps getBalance/income-baseline/
+-- behavioral-data reading earnings exactly as before, no separate code path.
+alter table earnings
+  add column if not exists payout_request_id uuid references payout_requests(id);
+
+create table if not exists notifications (
+  id uuid primary key default uuid_generate_v4(),
+  worker_id uuid references workers(id) not null,
+  type varchar not null,
+  title varchar not null,
+  body text not null,
+  tone varchar not null default 'info', -- success | warning | danger | info
+  read_at timestamp,
+  created_at timestamp default now()
+);
+
+create index if not exists idx_notifications_worker on notifications(worker_id, created_at desc);
+
+-- Same default-deny defense-in-depth as 20260706000002_rls_lockdown.sql —
+-- the Express backend is the only client and always uses the service-role
+-- key, which bypasses RLS entirely; this just means a leaked anon key gets
+-- nothing from these two new tables either.
+alter table payout_requests enable row level security;
+alter table notifications enable row level security;
+
+comment on column workers.is_admin is 'Flags a worker account as staff — same login, no separate admin auth system. Gates /api/payouts admin endpoints and the sidebar Admin nav item.';
+comment on table payout_requests is 'A worker-initiated request to be paid for bundled pending earnings. Reconciled unit is the request itself (one requested_total, one received_amount) — not each underlying earning individually, to avoid proportional-split complexity at the matching layer.';
+comment on column earnings.payout_request_id is 'Set when a pending earning is bundled into a payout request. Earnings keep their own received_amount/status too (set pro-rata once the request resolves) so balance/scoring queries need no special-casing.';
+comment on table notifications is 'Real in-app notifications — previously this was mocked even in live mode.';

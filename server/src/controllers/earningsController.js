@@ -1,27 +1,38 @@
+const crypto = require("crypto");
 const supabase = require("../config/database");
 const platformService = require("../services/platformService");
-const { generateReference } = require("../utils/helpers");
+const { computeNombaSignature } = require("../middleware/validateWebhook");
+const { generateReference, RECONCILED_EARNING_STATUSES } = require("../utils/helpers");
+const env = require("../config/env");
+const { ApiError } = require("../middleware/errorHandler");
+const logger = require("../utils/logger");
 
 async function getBalance(req, res, next) {
   try {
     const workerId = req.worker.id;
 
+    // Only earnings actually reconciled against a real VA deposit count as
+    // spendable balance — a pending platform-reported order isn't money yet.
     const [{ data: earnings, error: earningsError }, { data: settlements, error: settlementsError }] =
       await Promise.all([
-        supabase.from("earnings").select("amount, recorded_at").eq("worker_id", workerId),
+        supabase
+          .from("earnings")
+          .select("received_amount, reconciled_at")
+          .eq("worker_id", workerId)
+          .in("status", RECONCILED_EARNING_STATUSES),
         supabase.from("settlements").select("amount").eq("worker_id", workerId).eq("status", "completed"),
       ]);
     if (earningsError) throw earningsError;
     if (settlementsError) throw settlementsError;
 
-    const totalEarned = (earnings || []).reduce((sum, e) => sum + Number(e.amount), 0);
+    const totalEarned = (earnings || []).reduce((sum, e) => sum + Number(e.received_amount), 0);
     const totalSettled = (settlements || []).reduce((sum, s) => sum + Number(s.amount), 0);
     const balance = totalEarned - totalSettled;
 
     const today = new Date().toISOString().slice(0, 10);
     const dailyTotal = (earnings || [])
-      .filter((e) => e.recorded_at.slice(0, 10) === today)
-      .reduce((sum, e) => sum + Number(e.amount), 0);
+      .filter((e) => e.reconciled_at.slice(0, 10) === today)
+      .reduce((sum, e) => sum + Number(e.received_amount), 0);
 
     const { data: behavioral } = await supabase
       .from("worker_behavioral_data")
@@ -72,15 +83,16 @@ async function getDaily(req, res, next) {
     const workerId = req.worker.id;
     const { data, error } = await supabase
       .from("earnings")
-      .select("amount, recorded_at")
+      .select("received_amount, reconciled_at")
       .eq("worker_id", workerId)
-      .order("recorded_at", { ascending: true });
+      .in("status", RECONCILED_EARNING_STATUSES)
+      .order("reconciled_at", { ascending: true });
     if (error) throw error;
 
     const breakdown = {};
     for (const row of data || []) {
-      const day = row.recorded_at.slice(0, 10);
-      breakdown[day] = (breakdown[day] || 0) + Number(row.amount);
+      const day = row.reconciled_at.slice(0, 10);
+      breakdown[day] = (breakdown[day] || 0) + Number(row.received_amount);
     }
 
     res.json({ daily_breakdown: breakdown });
@@ -118,4 +130,129 @@ async function simulateEarning(req, res, next) {
   }
 }
 
-module.exports = { getBalance, getHistory, getDaily, simulateEarning };
+// POST /api/earnings/simulate-payment
+// The other half of the demo flow: simulateEarning() (above) reports a
+// pending order, same as a real platform webhook would. This simulates the
+// *payment* — the step that would normally be a real customer/platform bank
+// transfer landing in the worker's Nomba virtual account. Nomba's sandbox
+// has no API or dashboard tool to trigger that deposit on demand (VAs only
+// accept real interbank transfers), so this builds the exact payment_success
+// event Nomba would send, signs it with our real NOMBA_WEBHOOK_SECRET using
+// the same scheme validateNombaWebhook checks, and POSTs it to our own
+// /webhooks/nomba endpoint — the entire reconciliation pipeline (signature
+// verification, worker lookup, matching, over/underpayment handling) runs
+// for real; only the deposit's origin is synthetic. Passing an `amount` that
+// differs from the pending order's is intentional — that's how this proves
+// under/overpayment handling instead of only the happy path.
+async function simulateCustomerPayment(req, res, next) {
+  try {
+    const worker = req.worker;
+    const { amount, earning_id: earningId } = req.body || {};
+
+    let target = null;
+    if (earningId) {
+      const { data, error } = await supabase
+        .from("earnings")
+        .select("*")
+        .eq("id", earningId)
+        .eq("worker_id", worker.id)
+        .eq("status", "pending")
+        .maybeSingle();
+      if (error) throw error;
+      target = data;
+    } else {
+      const { data, error } = await supabase
+        .from("earnings")
+        .select("*")
+        .eq("worker_id", worker.id)
+        .eq("status", "pending")
+        .order("recorded_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      target = data;
+    }
+
+    const payAmount = Number(amount) || (target ? Number(target.amount) : null);
+    if (!payAmount) {
+      throw new ApiError(422, "amount_required", "No pending order to pay — specify an amount.");
+    }
+
+    const { data: virtualAccount, error: vaError } = await supabase
+      .from("virtual_accounts")
+      .select("bank_account_number")
+      .eq("worker_id", worker.id)
+      .maybeSingle();
+    if (vaError) throw vaError;
+    if (!virtualAccount) {
+      throw new ApiError(422, "no_virtual_account", "Complete bank details in onboarding first.");
+    }
+
+    const transactionId = generateReference("SIMPAY");
+    const timestamp = new Date().toISOString();
+    const payload = {
+      event_type: "payment_success",
+      requestId: crypto.randomUUID(),
+      data: {
+        merchant: {
+          walletId: env.NOMBA_SUB_ACCOUNT_ID || "demo-wallet",
+          walletBalance: 0,
+          userId: env.NOMBA_MAIN_ACCOUNT_ID || "demo-user",
+        },
+        transaction: {
+          aliasAccountNumber: virtualAccount.bank_account_number,
+          aliasAccountReference: `WORKER-${worker.id}`,
+          transactionId,
+          type: "vact_transfer",
+          transactionAmount: payAmount,
+          fee: 0,
+          time: timestamp,
+          responseCode: "00",
+        },
+        customer: {
+          senderName: "Demo Payer",
+          bankName: "Demo Bank",
+          accountNumber: "0000000000",
+          bankCode: "000",
+        },
+      },
+    };
+
+    const signature = computeNombaSignature(payload, timestamp, env.NOMBA_WEBHOOK_SECRET);
+
+    const response = await fetch(`${env.API_URL}/api/webhooks/nomba`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "nomba-signature": signature,
+        "nomba-timestamp": timestamp,
+        "nomba-signature-algorithm": "HmacSHA256",
+        "nomba-signature-version": "1.0.0",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      logger.error("Simulated payment webhook call failed", { status: response.status, body });
+      throw new ApiError(502, "webhook_call_failed", "Simulated payment could not be processed.");
+    }
+
+    const { data: reconciled } = await supabase
+      .from("earnings")
+      .select("*")
+      .eq("nomba_transaction_id", transactionId)
+      .maybeSingle();
+
+    res.json({
+      simulated: true,
+      amount: payAmount,
+      expected_amount: target ? Number(target.amount) : null,
+      status: reconciled?.status || null,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { getBalance, getHistory, getDaily, simulateEarning, simulateCustomerPayment };

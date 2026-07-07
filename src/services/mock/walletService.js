@@ -1,5 +1,6 @@
 import { simulate } from "../core/simulate";
 import { balanceSummary, todayActivity, currentWorker } from "../../data/mockData";
+import { earningsService } from "./earningsService";
 
 export const walletService = {
   async getBalance() {
@@ -7,7 +8,20 @@ export const walletService = {
   },
 
   async getTodayActivity() {
-    return simulate([...todayActivity], { delay: 500 });
+    // Static demo rows are treated as already-settled history; anything
+    // created via Simulate Delivery/Payment on top of them carries real
+    // pending/matched/underpaid/overpaid status so the reconciliation UI
+    // has something to show in mock mode too.
+    const staticRows = todayActivity.map((row) => ({ ...row, receivedAmount: row.amount, status: "matched" }));
+    const demoRows = earningsService.getMockOrders().map((o) => ({
+      id: o.id,
+      label: o.label,
+      time: new Date(o.recordedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+      amount: o.amount,
+      receivedAmount: o.receivedAmount ?? null,
+      status: o.status,
+    }));
+    return simulate([...demoRows, ...staticRows], { delay: 500 });
   },
 
   async getPaymentMethod() {

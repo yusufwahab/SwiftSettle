@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Wallet, TrendingUp, Clock, CalendarDays, Building2, Bell, Mail, MessageCircle, Phone,
-  CheckCircle2, Info, AlertTriangle, ShieldAlert, ArrowRight,
+  CheckCircle2, Info, AlertTriangle, ShieldAlert, ArrowRight, XCircle,
 } from "lucide-react";
 import { AreaChart, Area, ResponsiveContainer, YAxis } from "recharts";
 import { Link } from "react-router-dom";
@@ -12,9 +12,10 @@ import Badge from "../components/ui/dark/Badge";
 import Skeleton from "../components/ui/dark/Skeleton";
 import { ErrorState, EmptyState } from "../components/ui/dark/States";
 import SettlementModal from "../components/SettlementModal";
+import FinancialScoreCard from "../components/FinancialScoreCard";
 import { formatNaira } from "../lib/format";
 import { chartColors } from "../lib/chartTheme";
-import { walletService, earningsService, notificationsService } from "../services";
+import { walletService, earningsService, notificationsService, financialService, payoutsService } from "../services";
 import { useAsync } from "../hooks/useAsync";
 import { useAuth } from "../context/AuthContext";
 
@@ -23,18 +24,32 @@ const notifTone = {
   info: { icon: Info, className: "text-accent bg-accent/12" },
   primary: { icon: ShieldAlert, className: "text-accent bg-accent/12" },
   warning: { icon: AlertTriangle, className: "text-warning-vivid bg-warning-vivid/12" },
+  danger: { icon: XCircle, className: "text-danger-vivid bg-danger-vivid/12" },
 };
+
+const activityTone = {
+  pending: "neutral",
+  requested: "primary",
+  underpaid: "warning",
+  overpaid: "warning",
+  unmatched: "danger",
+};
+
+const OPEN_STATUSES = ["pending", "requested"];
 
 export default function Dashboard() {
   const { worker } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [simulating, setSimulating] = useState(false);
   const [simulateError, setSimulateError] = useState("");
+  const [requestingPayout, setRequestingPayout] = useState(false);
+  const [payoutError, setPayoutError] = useState("");
   const balanceState = useAsync(() => walletService.getBalance(), []);
   const activityState = useAsync(() => walletService.getTodayActivity(), []);
   const paymentState = useAsync(() => walletService.getPaymentMethod(), []);
   const weeklyState = useAsync(() => earningsService.getWeekly(), []);
   const notifState = useAsync(() => notificationsService.list(), []);
+  const scoreState = useAsync(() => financialService.getScore(), []);
 
   // No real gig-platform partner is wired up yet, so nothing ever records a
   // real earning on its own. This lets any onboarded worker add one
@@ -53,10 +68,36 @@ export default function Dashboard() {
     }
   };
 
+  const pendingOrders = activityState.data?.filter((row) => row.status === "pending") || [];
+  const pendingTotal = pendingOrders.reduce((sum, row) => sum + row.amount, 0);
+
+  // Doesn't move money itself — bundles every pending order into one
+  // request an admin has to process. The actual money movement (and the
+  // matched/underpaid/overpaid outcome) happens on the Admin page.
+  const handleRequestPayout = async () => {
+    setPayoutError("");
+    setRequestingPayout(true);
+    try {
+      await payoutsService.request();
+      await activityState.reload();
+    } catch (err) {
+      setPayoutError(err.message);
+    } finally {
+      setRequestingPayout(false);
+    }
+  };
+
   return (
     <AppLayout title="Dashboard" breadcrumb="Overview" rightRail={<RightRail notifState={notifState} />}>
       {!worker?.onboardingCompletedAt && <OnboardingNudge step={worker?.onboardingStep} />}
       <BalanceCard state={balanceState} onSettle={() => setModalOpen(true)} />
+
+      <div className="mt-5">
+        <FinancialScoreCard state={scoreState} compact />
+        <Link to="/app/credit" className="mt-2 inline-block text-sm text-accent hover:text-accent-dark">
+          View financial identity & credit →
+        </Link>
+      </div>
 
       <div className="mt-5 grid gap-5 sm:grid-cols-3">
         <StatCard
@@ -103,6 +144,23 @@ export default function Dashboard() {
             </button>
           </div>
           {simulateError && <p className="mb-2 text-xs text-danger-vivid">{simulateError}</p>}
+          {pendingOrders.length > 0 && (
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-xl bg-accent/8 p-3">
+              <p className="text-xs text-text-2">
+                {pendingOrders.length} order{pendingOrders.length === 1 ? "" : "s"} worth{" "}
+                {formatNaira(pendingTotal)} awaiting payout
+              </p>
+              <Button
+                variant="subtle"
+                onClick={handleRequestPayout}
+                disabled={requestingPayout}
+                className="shrink-0 px-3 py-1.5 text-xs"
+              >
+                {requestingPayout ? "Requesting…" : "Request Payout"}
+              </Button>
+            </div>
+          )}
+          {payoutError && <p className="mb-2 text-xs text-danger-vivid">{payoutError}</p>}
           {activityState.status === "loading" && (
             <div className="space-y-3 py-3">
               <Skeleton className="h-5" />
@@ -121,13 +179,22 @@ export default function Dashboard() {
               {activityState.data.map((row, index) => (
                 <div
                   key={row.id}
-                  className={`flex items-center justify-between py-3 text-sm ${
+                  className={`flex items-center justify-between gap-3 py-3 text-sm ${
                     index < activityState.data.length - 1 ? "border-b border-white/6" : ""
                   }`}
                 >
-                  <span className="text-text-1">{row.label}</span>
+                  <span className="min-w-0 flex-1 truncate text-text-1">{row.label}</span>
                   <span className="text-text-3">{row.time}</span>
-                  <span className="font-medium text-accent-2">+{formatNaira(row.amount)}</span>
+                  {row.status && row.status !== "matched" && (
+                    <Badge tone={activityTone[row.status] || "neutral"}>{row.status}</Badge>
+                  )}
+                  {OPEN_STATUSES.includes(row.status) ? (
+                    <span className="shrink-0 text-text-3">{formatNaira(row.amount)} expected</span>
+                  ) : (
+                    <span className="shrink-0 font-medium text-accent-2">
+                      +{formatNaira(row.receivedAmount ?? row.amount)}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>

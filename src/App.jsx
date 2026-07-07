@@ -8,6 +8,8 @@ import Dashboard from "./pages/Dashboard";
 import OnboardingWizard from "./pages/OnboardingWizard";
 import SettlementsPage from "./pages/SettlementsPage";
 import EarningsPage from "./pages/EarningsPage";
+import CreditPage from "./pages/CreditPage";
+import AdminPayoutsPage from "./pages/AdminPayoutsPage";
 import SettingsPage from "./pages/SettingsPage";
 import SupportPage from "./pages/SupportPage";
 
@@ -49,6 +51,22 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <EarningsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/credit"
+            element={
+              <ProtectedRoute>
+                <CreditPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/admin/payouts"
+            element={
+              <ProtectedRoute>
+                <AdminPayoutsPage />
               </ProtectedRoute>
             }
           />

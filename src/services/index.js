@@ -14,6 +14,9 @@ import { preferencesService as mockPreferencesService } from "./mock/preferences
 import { notificationsService as mockNotificationsService } from "./mock/notificationsService";
 import { onboardingService as mockOnboardingService } from "./mock/onboardingService";
 import { banksService as mockBanksService } from "./mock/banksService";
+import { financialService as mockFinancialService } from "./mock/financialService";
+import { creditService as mockCreditService } from "./mock/creditService";
+import { payoutsService as mockPayoutsService } from "./mock/payoutsService";
 
 import { authService as liveAuthService } from "./live/authService";
 import { walletService as liveWalletService } from "./live/walletService";
@@ -21,6 +24,10 @@ import { earningsService as liveEarningsService } from "./live/earningsService";
 import { settlementsService as liveSettlementsService } from "./live/settlementsService";
 import { onboardingService as liveOnboardingService } from "./live/onboardingService";
 import { banksService as liveBanksService } from "./live/banksService";
+import { financialService as liveFinancialService } from "./live/financialService";
+import { creditService as liveCreditService } from "./live/creditService";
+import { notificationsService as liveNotificationsService } from "./live/notificationsService";
+import { payoutsService as livePayoutsService } from "./live/payoutsService";
 
 const registry = {
   mock: {
@@ -33,6 +40,9 @@ const registry = {
     notificationsService: mockNotificationsService,
     onboardingService: mockOnboardingService,
     banksService: mockBanksService,
+    financialService: mockFinancialService,
+    creditService: mockCreditService,
+    payoutsService: mockPayoutsService,
   },
   live: {
     authService: liveAuthService,
@@ -41,12 +51,15 @@ const registry = {
     settlementsService: liveSettlementsService,
     onboardingService: liveOnboardingService,
     banksService: liveBanksService,
-    // No backend exists for support/FAQ, notification-panel copy, or
-    // notification preferences in either prompt — live mode still reads
-    // this canned content rather than the app breaking outright.
+    financialService: liveFinancialService,
+    creditService: liveCreditService,
+    notificationsService: liveNotificationsService,
+    payoutsService: livePayoutsService,
+    // No backend exists for support/FAQ or notification preferences in
+    // either prompt — live mode still reads this canned content rather
+    // than the app breaking outright.
     supportService: mockSupportService,
     preferencesService: mockPreferencesService,
-    notificationsService: mockNotificationsService,
   },
 };
 
@@ -61,3 +74,6 @@ export const preferencesService = active.preferencesService;
 export const notificationsService = active.notificationsService;
 export const onboardingService = active.onboardingService;
 export const banksService = active.banksService;
+export const financialService = active.financialService;
+export const creditService = active.creditService;
+export const payoutsService = active.payoutsService;

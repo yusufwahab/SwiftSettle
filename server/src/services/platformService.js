@@ -1,5 +1,6 @@
 const supabase = require("../config/database");
 const logger = require("../utils/logger");
+const { RECONCILED_EARNING_STATUSES } = require("../utils/helpers");
 
 // Called by the platform webhook handler when a gig platform reports a
 // completed order. Insert is idempotent via the unique
@@ -29,20 +30,22 @@ async function recordEarning({ workerId, platform, orderId, amount, description 
   return { duplicate: false };
 }
 
-// income_baseline = verified monthly average from real recorded earnings
-// only (never a user-entered claim) — the rolling sum of the trailing 30
-// days of `earnings` rows.
+// income_baseline = verified monthly average from earnings actually
+// reconciled against a real VA deposit (received_amount), never an
+// unreconciled platform claim (amount) — the rolling sum of the trailing
+// 30 days of reconciled `earnings` rows.
 async function recalculateIncomeBaseline(workerId) {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
   const { data: earnings, error } = await supabase
     .from("earnings")
-    .select("amount, recorded_at")
+    .select("received_amount, reconciled_at")
     .eq("worker_id", workerId)
-    .gte("recorded_at", thirtyDaysAgo);
+    .in("status", RECONCILED_EARNING_STATUSES)
+    .gte("reconciled_at", thirtyDaysAgo);
   if (error) throw error;
 
-  const total = (earnings || []).reduce((sum, e) => sum + Number(e.amount), 0);
+  const total = (earnings || []).reduce((sum, e) => sum + Number(e.received_amount), 0);
   const hasEnoughHistory = (earnings || []).length >= 5; // arbitrary minimum sample before calling income "verified"
 
   const { error: updateError } = await supabase
@@ -65,9 +68,10 @@ async function updateBehavioralData(workerId) {
   const [{ data: earnings }, { data: settlements }] = await Promise.all([
     supabase
       .from("earnings")
-      .select("amount, recorded_at")
+      .select("received_amount, reconciled_at")
       .eq("worker_id", workerId)
-      .order("recorded_at", { ascending: true }),
+      .in("status", RECONCILED_EARNING_STATUSES)
+      .order("reconciled_at", { ascending: true }),
     supabase
       .from("settlements")
       .select("amount, status, requested_at, settled_at")
@@ -77,8 +81,8 @@ async function updateBehavioralData(workerId) {
 
   const dailyTotals = {};
   for (const e of earnings || []) {
-    const day = e.recorded_at.slice(0, 10);
-    dailyTotals[day] = (dailyTotals[day] || 0) + Number(e.amount);
+    const day = e.reconciled_at.slice(0, 10);
+    dailyTotals[day] = (dailyTotals[day] || 0) + Number(e.received_amount);
   }
   const dailyEarnings = Object.entries(dailyTotals).map(([date, amount]) => ({ date, amount }));
 
@@ -103,7 +107,7 @@ async function updateBehavioralData(workerId) {
 
 function averageHoursToSettlement(earnings, completedSettlements) {
   if (earnings.length === 0 || completedSettlements.length === 0) return null;
-  const firstEarning = new Date(earnings[0].recorded_at).getTime();
+  const firstEarning = new Date(earnings[0].reconciled_at).getTime();
   const lastSettlement = new Date(completedSettlements[completedSettlements.length - 1].settled_at).getTime();
   const hours = (lastSettlement - firstEarning) / (1000 * 60 * 60);
   return Math.max(0, Math.round(hours));

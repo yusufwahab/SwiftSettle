@@ -4,12 +4,15 @@ import {
 import { Star } from "lucide-react";
 import AppLayout from "../components/layout/AppLayout";
 import Card from "../components/ui/Card";
+import Badge from "../components/ui/dark/Badge";
 import Skeleton from "../components/ui/dark/Skeleton";
-import { ErrorState } from "../components/ui/dark/States";
+import { ErrorState, EmptyState } from "../components/ui/dark/States";
 import { formatNaira } from "../lib/format";
 import { chartColors } from "../lib/chartTheme";
-import { earningsService } from "../services";
+import { earningsService, payoutsService } from "../services";
 import { useAsync } from "../hooks/useAsync";
+
+const payoutTone = { requested: "primary", matched: "success", underpaid: "warning", overpaid: "warning" };
 
 const tooltipStyle = {
   background: "#181d26",
@@ -24,9 +27,57 @@ export default function EarningsPage() {
   const monthlyState = useAsync(() => earningsService.getMonthly(), []);
   const statsState = useAsync(() => earningsService.getStats(), []);
   const performanceState = useAsync(() => earningsService.getPerformance(), []);
+  const payoutsState = useAsync(() => payoutsService.mine(), []);
 
   return (
     <AppLayout title="Earnings" breadcrumb="Earnings" subtitle="Track your income and performance">
+      <Card className="mb-5">
+        <p className="mb-4 text-sm font-bold text-text-1">Payout Requests</p>
+        {payoutsState.status === "loading" && (
+          <div className="space-y-3">
+            <Skeleton className="h-10" />
+            <Skeleton className="h-10" />
+          </div>
+        )}
+        {payoutsState.status === "error" && (
+          <ErrorState message={payoutsState.error} onRetry={payoutsState.reload} className="py-6" />
+        )}
+        {payoutsState.status === "success" && payoutsState.data.length === 0 && (
+          <EmptyState
+            title="No payout requests yet"
+            message="Request a payout from the Dashboard once you have completed orders awaiting payment."
+            className="py-6"
+          />
+        )}
+        {payoutsState.status === "success" && payoutsState.data.length > 0 && (
+          <div>
+            {payoutsState.data.map((r, index) => (
+              <div
+                key={r.id}
+                className={`flex items-center justify-between gap-3 py-3 text-sm ${
+                  index < payoutsState.data.length - 1 ? "border-b border-white/6" : ""
+                }`}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-text-1">
+                    {(r.earnings || []).length} order{(r.earnings || []).length === 1 ? "" : "s"} ·{" "}
+                    {new Date(r.requested_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                  </p>
+                </div>
+                <Badge tone={payoutTone[r.status] || "neutral"}>{r.status}</Badge>
+                <span className="shrink-0 text-right">
+                  {r.status === "requested" ? (
+                    <span className="text-text-3">{formatNaira(r.requested_total)} requested</span>
+                  ) : (
+                    <span className="font-medium text-accent-2">{formatNaira(r.received_amount)} received</span>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
       <Card className="mb-5">
         <p className="mb-4 text-sm font-bold text-text-1">Weekly Earnings</p>
         <ChartFrame state={weeklyState} height={260}>

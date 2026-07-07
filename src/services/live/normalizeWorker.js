@@ -41,5 +41,6 @@ export function normalizeWorker(raw) {
     twoFactorEnabled: Boolean(raw.two_factor_enabled),
     onboardingStep: raw.onboarding_step ?? 1,
     onboardingCompletedAt: raw.onboarding_completed_at || null,
+    isAdmin: Boolean(raw.is_admin),
   };
 }

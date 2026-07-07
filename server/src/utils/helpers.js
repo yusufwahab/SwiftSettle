@@ -16,6 +16,11 @@ function generateCertificateId() {
   return `VIC-${year}-${rand}`;
 }
 
+// earnings.status values that represent money actually confirmed via a
+// Nomba webhook (direct or payout-request-mediated) — 'pending' and
+// 'requested' are claims/awaiting-payment, not real money yet.
+const RECONCILED_EARNING_STATUSES = ["matched", "underpaid", "overpaid", "unmatched"];
+
 function daysBetween(from, to = new Date()) {
   const ms = new Date(to).getTime() - new Date(from).getTime();
   return Math.floor(ms / (1000 * 60 * 60 * 24));
@@ -27,4 +32,11 @@ function addDays(date, days) {
   return result;
 }
 
-module.exports = { generateOtpCode, generateReference, generateCertificateId, daysBetween, addDays };
+module.exports = {
+  generateOtpCode,
+  generateReference,
+  generateCertificateId,
+  daysBetween,
+  addDays,
+  RECONCILED_EARNING_STATUSES,
+};

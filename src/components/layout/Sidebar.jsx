@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard, TrendingUp, CheckCircle2, Settings as SettingsIcon, HelpCircle,
-  Search, ChevronDown, LogOut,
+  Search, ChevronDown, LogOut, ShieldCheck, Landmark,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import Photo from "../Photo";
@@ -10,7 +10,10 @@ const menuItems = [
   { to: "/app/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/app/earnings", label: "Earnings", icon: TrendingUp },
   { to: "/app/settlements", label: "Settlements", icon: CheckCircle2 },
+  { to: "/app/credit", label: "Credit & Identity", icon: ShieldCheck },
 ];
+
+const adminItems = [{ to: "/app/admin/payouts", label: "Admin: Payouts", icon: Landmark }];
 
 const accountItems = [
   { to: "/app/settings", label: "Settings", icon: SettingsIcon },
@@ -70,6 +73,7 @@ export default function Sidebar({ onNavigate }) {
 
       <nav className="flex-1 overflow-y-auto px-3">
         <NavGroup label="Menu" items={menuItems} onNavigate={onNavigate} />
+        {worker?.isAdmin && <NavGroup label="Admin" items={adminItems} onNavigate={onNavigate} />}
         <NavGroup label="Account" items={accountItems} onNavigate={onNavigate} />
       </nav>
 
