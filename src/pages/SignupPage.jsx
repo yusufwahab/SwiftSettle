@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Photo from "../components/Photo";
 import Button from "../components/ui/dark/Button";
 import { TextField } from "../components/ui/dark/Field";
 import { useAuth } from "../context/AuthContext";
+
+const RESEND_COOLDOWN_SECONDS = 60;
 
 export default function SignupPage() {
   const navigate = useNavigate();
@@ -14,6 +16,15 @@ export default function SignupPage() {
   const [otp, setOtp] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (cooldown <= 0) return undefined;
+    const timer = setInterval(() => setCooldown((c) => c - 1), 1000);
+    return () => clearInterval(timer);
+  }, [cooldown]);
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
@@ -32,10 +43,30 @@ export default function SignupPage() {
     try {
       await startSignup(form);
       setStep("otp");
+      setCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (err) {
       setError(err.message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Reuses the same signup call — the backend already treats a repeat
+  // signup for an unverified email as "resend a fresh code" (it updates the
+  // existing unverified worker row rather than erroring), so no separate
+  // resend endpoint is needed.
+  const handleResend = async () => {
+    setError("");
+    setResendMessage("");
+    setResending(true);
+    try {
+      await startSignup(form);
+      setResendMessage("A new code has been sent.");
+      setCooldown(RESEND_COOLDOWN_SECONDS);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setResending(false);
     }
   };
 
@@ -115,19 +146,30 @@ export default function SignupPage() {
                 required
               />
 
+              {resendMessage && !error && <p className="text-sm text-accent-2">{resendMessage}</p>}
               {error && <p className="text-sm text-danger-vivid">{error}</p>}
 
               <Button type="submit" disabled={submitting} className="w-full">
                 {submitting ? "Verifying…" : "Verify & Continue"}
               </Button>
 
-              <button
-                type="button"
-                onClick={() => setStep("form")}
-                className="text-center text-xs text-text-3 hover:text-text-1"
-              >
-                Wrong email? Go back
-              </button>
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setStep("form")}
+                  className="text-xs text-text-3 hover:text-text-1"
+                >
+                  Wrong email? Go back
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={resending || cooldown > 0}
+                  className="text-xs text-accent hover:text-accent-dark disabled:opacity-50 disabled:hover:text-accent"
+                >
+                  {resending ? "Sending…" : cooldown > 0 ? `Resend code (${cooldown}s)` : "Resend code"}
+                </button>
+              </div>
             </form>
           )}
 
