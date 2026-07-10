@@ -63,6 +63,22 @@ async function transferToBank({ amount, accountNumber, accountName, bankCode, re
   };
 }
 
+// POST /v1/transfers/bank/lookup — verified against developer.nomba.com
+// (2026-07-12). No sub-account ID in the path (unlike transferToBank) —
+// the accountId header nombaRequest already attaches is enough. Resolves
+// the real account holder's name for a recipient before any money moves,
+// so a worker sending a bill payment sees who they're actually paying
+// instead of trusting a raw account number.
+async function lookupBankAccount({ accountNumber, bankCode }) {
+  const response = await nombaRequest({
+    method: "POST",
+    url: "/v1/transfers/bank/lookup",
+    data: { accountNumber, bankCode },
+  });
+
+  return { accountNumber: response.data.accountNumber, accountName: response.data.accountName };
+}
+
 // GET /v1/transfers/banks
 // Returns a plain array of [{ name, code }] (not wrapped in a `results`
 // field — confirmed against the real sandbox response). Nomba's docs note
@@ -78,4 +94,4 @@ async function getBankList() {
   return cachedBankList;
 }
 
-module.exports = { createVirtualAccount, transferToBank, getBankList };
+module.exports = { createVirtualAccount, transferToBank, getBankList, lookupBankAccount };

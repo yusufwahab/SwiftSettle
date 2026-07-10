@@ -13,6 +13,7 @@ async function getScore(req, res, next) {
 
     res.json({
       score: scoreValue,
+      max_score: scoringService.MAX_POSSIBLE_SCORE,
       tier: scoringService.creditTierFor(scoreValue),
       components,
       days_until_certificate: daysUntilCertificate,

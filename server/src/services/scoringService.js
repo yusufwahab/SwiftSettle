@@ -4,6 +4,14 @@ const { daysBetween, generateCertificateId, addDays } = require("../utils/helper
 
 // Exact component weights from updatedPrompt.md / BackendPrompt.md.
 // 50 + 75 + 100 + 50 + 150 + 200 + 100 + 75 + 50 = 850.
+//
+// BILL_PAYMENT_MAX is NOT part of that literal spec — added per direct
+// follow-up instruction for the bill-payments feature (rent/school
+// fees/gym/other transfers to a third party). Deliberately additive rather
+// than carved out of the existing 850 (which would mean shrinking a weight
+// the prompt gave as an exact number) — the true max is now 900, and the
+// UI's score displays read this dynamically rather than hardcoding "/850".
+// See server/README.md's deviations list.
 const WEIGHTS = {
   PHONE: 50,
   BANK: 75,
@@ -14,7 +22,10 @@ const WEIGHTS = {
   CONSISTENCY_MAX: 100,
   TREND_MAX: 75,
   TIME_TO_SETTLE_MAX: 50,
+  BILL_PAYMENT_MAX: 50,
 };
+
+const MAX_POSSIBLE_SCORE = Object.values(WEIGHTS).reduce((sum, w) => sum + w, 0);
 
 const CREDIT_ELIGIBLE_THRESHOLD = 600;
 
@@ -81,21 +92,50 @@ function scoreTimeToSettlement(behavioral) {
   return 0;
 }
 
+// A one-off transfer to a new recipient doesn't move the score — only a
+// recipient paid in 2+ distinct calendar months counts, since that's an
+// actual recurring obligation (rent, school fees) being met reliably, not
+// just "a transfer happened". Each qualifying month is worth
+// BILL_PAYMENT_POINTS_PER_MONTH, capped at WEIGHTS.BILL_PAYMENT_MAX.
+const BILL_PAYMENT_POINTS_PER_MONTH = 10;
+
+function scoreResponsibleBillPayments(billPayments) {
+  const monthsByRecipient = new Map();
+  for (const b of billPayments || []) {
+    if (b.status !== "completed") continue;
+    const key = `${b.recipient_account_number}:${b.recipient_bank_code}`;
+    const month = b.created_at.slice(0, 7); // YYYY-MM
+    if (!monthsByRecipient.has(key)) monthsByRecipient.set(key, new Set());
+    monthsByRecipient.get(key).add(month);
+  }
+
+  let recurringMonths = 0;
+  for (const months of monthsByRecipient.values()) {
+    if (months.size >= 2) recurringMonths += months.size;
+  }
+
+  return Math.min(WEIGHTS.BILL_PAYMENT_MAX, recurringMonths * BILL_PAYMENT_POINTS_PER_MONTH);
+}
+
 async function getWorkerScoreInputs(workerId) {
-  const [{ data: worker }, { data: settlements }, { data: behavioral }] = await Promise.all([
+  const [{ data: worker }, { data: settlements }, { data: behavioral }, { data: billPayments }] = await Promise.all([
     supabase.from("workers").select("*").eq("id", workerId).single(),
     supabase.from("settlements").select("status").eq("worker_id", workerId),
     supabase.from("worker_behavioral_data").select("*").eq("worker_id", workerId).maybeSingle(),
+    supabase
+      .from("bill_payments")
+      .select("status, recipient_account_number, recipient_bank_code, created_at")
+      .eq("worker_id", workerId),
   ]);
 
-  return { worker, settlements: settlements || [], behavioral };
+  return { worker, settlements: settlements || [], behavioral, billPayments: billPayments || [] };
 }
 
 // The full component breakdown + total, without writing anything — used by
 // GET /financial-score to show a live preview as well as by the persisted
 // calculateScore() below.
 async function computeScore(workerId) {
-  const { worker, settlements, behavioral } = await getWorkerScoreInputs(workerId);
+  const { worker, settlements, behavioral, billPayments } = await getWorkerScoreInputs(workerId);
   if (!worker) throw new Error("Worker not found.");
 
   const tenureDays = daysBetween(worker.account_creation_date);
@@ -110,6 +150,7 @@ async function computeScore(workerId) {
     settlement_consistency: scoreSettlementConsistency(behavioral, settlements, tenureDays),
     earnings_trend: scoreEarningsTrend(behavioral),
     time_to_settlement: scoreTimeToSettlement(behavioral),
+    responsible_bill_payments: scoreResponsibleBillPayments(billPayments),
   };
 
   const scoreValue = Object.values(components).reduce((sum, v) => sum + v, 0);
@@ -219,6 +260,7 @@ async function autoTriggerAt30Days() {
 
 module.exports = {
   WEIGHTS,
+  MAX_POSSIBLE_SCORE,
   CREDIT_ELIGIBLE_THRESHOLD,
   creditTierFor,
   computeScore,

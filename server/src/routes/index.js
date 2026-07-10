@@ -12,5 +12,6 @@ router.use("/admin", require("./admin.routes"));
 router.use("/banks", require("./banks.routes"));
 router.use("/payouts", require("./payouts.routes"));
 router.use("/notifications", require("./notifications.routes"));
+router.use("/bill-payments", require("./billPayments.routes"));
 
 module.exports = router;

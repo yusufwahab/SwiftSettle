@@ -17,6 +17,7 @@ import { banksService as mockBanksService } from "./mock/banksService";
 import { financialService as mockFinancialService } from "./mock/financialService";
 import { creditService as mockCreditService } from "./mock/creditService";
 import { payoutsService as mockPayoutsService } from "./mock/payoutsService";
+import { billPaymentsService as mockBillPaymentsService } from "./mock/billPaymentsService";
 
 import { authService as liveAuthService } from "./live/authService";
 import { walletService as liveWalletService } from "./live/walletService";
@@ -28,6 +29,7 @@ import { financialService as liveFinancialService } from "./live/financialServic
 import { creditService as liveCreditService } from "./live/creditService";
 import { notificationsService as liveNotificationsService } from "./live/notificationsService";
 import { payoutsService as livePayoutsService } from "./live/payoutsService";
+import { billPaymentsService as liveBillPaymentsService } from "./live/billPaymentsService";
 
 const registry = {
   mock: {
@@ -43,6 +45,7 @@ const registry = {
     financialService: mockFinancialService,
     creditService: mockCreditService,
     payoutsService: mockPayoutsService,
+    billPaymentsService: mockBillPaymentsService,
   },
   live: {
     authService: liveAuthService,
@@ -55,6 +58,7 @@ const registry = {
     creditService: liveCreditService,
     notificationsService: liveNotificationsService,
     payoutsService: livePayoutsService,
+    billPaymentsService: liveBillPaymentsService,
     // No backend exists for support/FAQ or notification preferences in
     // either prompt — live mode still reads this canned content rather
     // than the app breaking outright.
@@ -77,3 +81,4 @@ export const banksService = active.banksService;
 export const financialService = active.financialService;
 export const creditService = active.creditService;
 export const payoutsService = active.payoutsService;
+export const billPaymentsService = active.billPaymentsService;

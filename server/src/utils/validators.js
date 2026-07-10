@@ -79,6 +79,26 @@ const schemas = {
     code: Joi.string().length(6).pattern(/^[0-9]+$/).required(),
   }),
 
+  verifyRecipient: Joi.object({
+    account_number: Joi.string().length(10).pattern(/^[0-9]+$/).required(),
+    bank_code: Joi.string()
+      .pattern(/^[0-9]{3}([0-9]{3})?$/)
+      .required()
+      .messages({ "string.pattern.base": "bankCode must be exactly 3 or 6 digits." }),
+  }),
+
+  createBillPayment: Joi.object({
+    category: Joi.string().valid("rent", "school_fees", "gym", "other").required(),
+    account_number: Joi.string().length(10).pattern(/^[0-9]+$/).required(),
+    bank_code: Joi.string()
+      .pattern(/^[0-9]{3}([0-9]{3})?$/)
+      .required()
+      .messages({ "string.pattern.base": "bankCode must be exactly 3 or 6 digits." }),
+    bank_name: Joi.string().optional(),
+    account_name: Joi.string().required(),
+    amount: Joi.number().positive().required(),
+  }),
+
   platformWebhook: Joi.object({
     order_id: Joi.string().required(),
     worker_id: Joi.string().uuid().required(),

@@ -82,12 +82,19 @@ require the calling worker's `is_admin` flag to be `true`.
 | POST | `/simulate` | Records a completed order (pending, not yet paid) — route name is a holdover from before the frontend called this "Log a Completed Order" |
 | POST | `/simulate-payment` | Settles the payment for a logged order directly (see "Reconciliation" below) |
 
-**Settlements** (`/api/settlements`) — outbound VA-balance → bank transfer, worker-initiated, unrelated to payout requests
+**Settlements** (`/api/settlements`) — outbound VA-balance → the worker's own bank, worker-initiated, unrelated to payout requests
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/create` | Real Nomba transfer of the full available balance to the worker's bank |
+| POST | `/create` | Real Nomba transfer of a worker-chosen amount (up to the full available balance) to the worker's own bank |
 | GET | `/status/:settlement_id` | One settlement's status |
 | GET | `/history` | List, filterable by `?status=` |
+
+**Bill payments** (`/api/bill-payments`) — outbound VA-balance → a third-party recipient, categorized (rent/school fees/gym/other)
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/verify-recipient` | Resolves the real account holder's name via Nomba's lookup endpoint before any transfer |
+| POST | `/create` | Real Nomba transfer to the verified recipient |
+| GET | `/` | Worker's own bill-payment history |
 
 **Payout requests** (`/api/payouts`) — the inbound "get paid for completed work" flow
 | Method | Path | Purpose |
@@ -102,7 +109,7 @@ require the calling worker's `is_admin` flag to be `true`.
 **Financial identity** (`/api/financial`)
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/score` | Current score (0–850) + component breakdown |
+| GET | `/score` | Current score (0–`max_score`, 900) + component breakdown |
 | GET | `/identity-status` | Progress toward the 30-day certificate, milestone checklist |
 | GET | `/certificate` | Verified income certificate (404 until issued) |
 
@@ -216,6 +223,34 @@ Processing a request:
   internal tool, not a worker-facing role) — not consolidated into one
   mechanism on purpose.
 
+## Bill payments & the credit score
+
+A worker can send part of their available balance to a third-party
+recipient under a category (rent, school fees, gym, other) instead of only
+ever settling to their own registered bank. Same underlying
+`nombaService.transferToBank()` call as settlements — the only difference
+is the recipient. Before any transfer, `POST /bill-payments/verify-recipient`
+calls Nomba's real account-lookup endpoint (`POST /v1/transfers/bank/lookup`)
+to resolve the actual account holder's name, so the worker confirms who
+they're paying rather than trusting a raw account number they might have
+mistyped.
+
+Bill payments draw from the exact same balance pool as settlements —
+`balanceService.getAvailableBalance()` (the one shared function both
+features and `GET /earnings/balance` all call) subtracts committed amounts
+from both, so a worker can't double-spend the same money through both
+features at once.
+
+**The credit-score angle is deliberately narrow.** A one-off transfer to a
+new recipient doesn't move the score — only a recipient paid in 2+ distinct
+calendar months counts, since that's an actual recurring obligation (rent,
+school fees) being met reliably, not just "a transfer happened."
+`scoringService.scoreResponsibleBillPayments()` awards 10 points per
+qualifying month, capped at 50. This was a deliberate design choice over
+the simpler "+N points per bill payment" — that would have been trivially
+gameable (transfer to yourself repeatedly) and wouldn't reflect anything
+real about financial reliability.
+
 ## Where this deviates from the prompts (and why)
 
 Both `updatedPrompt.md` and `BackendPrompt.md` describe the system at a level that leaves some real gaps — implementing them literally would leave features that can't actually function. Each deviation is also commented at the point in the code where it happens:
@@ -237,6 +272,10 @@ Both `updatedPrompt.md` and `BackendPrompt.md` describe the system at a level th
 - **Auth changed from phone+OTP to email+password, per direct follow-up instruction.** `POST /auth/signup` now takes `full_name`/`email`/`password`; `POST /auth/verify-email` confirms an email OTP (sent via Brevo) and is what actually issues the first session; `POST /auth/login` is plain email+password. Twilio is gone entirely. `workers.password_hash` and `workers.email_verified` were added; `workers.phone_number` was relaxed to nullable since it's no longer collected at signup.
 - **Onboarding wizard shrank from 8 steps to 4** (personal/contact, bank, security, consent) and moved entirely to *after* signup, and every step is skippable — the frontend shows a persistent "complete your profile" nudge on the dashboard and settings page instead of blocking anything. `POST /auth/verify-phone-update`'s name is a holdover from the old design; it no longer verifies a phone number — it just records one as contact info at step 1.
 - **Brevo replaces both Twilio (OTP) and SendGrid (notifications)** — verified against `developers.brevo.com`: `POST https://api.brevo.com/v3/smtp/email` with an `api-key` header, not a bearer token.
+- **`workers.is_admin` now defaults `true`, per direct follow-up instruction**, removing the self-service "Enable Admin Access" step entirely. Every worker can see and process every payout request — a deliberate simplification for single-tenant demo use, not a real access-control model (see "Two separate admin mechanisms" above).
+- **Available-balance calculation unified into one function** (`balanceService.getAvailableBalance()`), fixing a real bug: `GET /earnings/balance` previously only subtracted settlements with status `completed`, so a worker's dashboard balance stayed unchanged after transferring until Nomba's own webhook eventually confirmed it (which, without a public webhook URL registered, might never happen locally) — it now subtracts anything at least `pending`/`processing`, same as the internal check `createSettlement` already used to validate a request. The internal check itself also had a second, separate bug (it summed *unreconciled* `earnings.amount` instead of `received_amount`) — fixed the same way.
+- **Settlements changed from "always the full balance" to a worker-chosen amount**, per direct follow-up instruction — `POST /settlements/create` already accepted an arbitrary `amount`; only the frontend hardcoded the full balance.
+- **`bill_payments` table + `/api/bill-payments` + a new `responsible_bill_payments` score component added**, none of which exist in either prompt — per direct follow-up instruction, to let a worker pay third parties (rent/school fees/gym/other) and have recurring payments build credit history. `scoringService.WEIGHTS` totaled exactly 850 in both prompts (an exact, literal spec) — rather than shrink an existing weight to make room, `BILL_PAYMENT_MAX` (50) is purely additive, making the real max `MAX_POSSIBLE_SCORE` 900. The frontend reads this dynamically (`GET /financial/score`'s `max_score` field) rather than hardcoding "/850".
 
 See `docs/database/relationships.md` (project root) for the full schema-level writeup.
 

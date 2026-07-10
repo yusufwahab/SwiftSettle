@@ -3,7 +3,10 @@ import Badge from "./ui/dark/Badge";
 import Skeleton from "./ui/dark/Skeleton";
 import { ErrorState } from "./ui/dark/States";
 
-const MAX_SCORE = 850;
+// Fallback only — the real cap comes from the API's max_score (the backend
+// is the single source of truth for the weight total, see
+// server/src/services/scoringService.js's WEIGHTS/MAX_POSSIBLE_SCORE).
+const FALLBACK_MAX_SCORE = 900;
 
 const COMPONENT_META = [
   { key: "phone_verified", label: "Phone Verified", max: 50 },
@@ -15,6 +18,7 @@ const COMPONENT_META = [
   { key: "settlement_consistency", label: "Settlement Consistency", max: 100 },
   { key: "earnings_trend", label: "Earnings Trend", max: 75 },
   { key: "time_to_settlement", label: "Time to Settlement", max: 50 },
+  { key: "responsible_bill_payments", label: "Responsible Bill Payments", max: 50 },
 ];
 
 const tierTone = { premium: "success", standard: "primary", basic: "warning", none: "neutral" };
@@ -38,8 +42,9 @@ export default function FinancialScoreCard({ state, compact = false }) {
     );
   }
 
-  const { score, tier, components } = state.data;
-  const pct = Math.min(100, Math.round((score / MAX_SCORE) * 100));
+  const { score, tier, components, max_score: maxScore } = state.data;
+  const effectiveMax = maxScore || FALLBACK_MAX_SCORE;
+  const pct = Math.min(100, Math.round((score / effectiveMax) * 100));
 
   return (
     <Card>
@@ -50,7 +55,7 @@ export default function FinancialScoreCard({ state, compact = false }) {
 
       <div className="mt-2 flex items-baseline gap-2">
         <p className="text-4xl font-bold text-text-1">{score}</p>
-        <p className="text-sm text-text-3">/ {MAX_SCORE}</p>
+        <p className="text-sm text-text-3">/ {effectiveMax}</p>
       </div>
 
       <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/8">

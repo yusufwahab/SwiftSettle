@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Wallet, TrendingUp, Clock, CalendarDays, Building2, Bell, Mail, MessageCircle, Phone,
-  CheckCircle2, Info, AlertTriangle, ShieldAlert, ArrowRight, XCircle, ClipboardCheck, KeyRound,
+  CheckCircle2, Info, AlertTriangle, ShieldAlert, ArrowRight, XCircle, ClipboardCheck, KeyRound, Receipt,
 } from "lucide-react";
 import { AreaChart, Area, ResponsiveContainer, YAxis } from "recharts";
 import { Link } from "react-router-dom";
@@ -14,6 +14,7 @@ import { ErrorState, EmptyState } from "../components/ui/dark/States";
 import { TextField } from "../components/ui/dark/Field";
 import SettlementModal from "../components/SettlementModal";
 import LogOrderModal from "../components/LogOrderModal";
+import BillPaymentModal from "../components/BillPaymentModal";
 import FinancialScoreCard from "../components/FinancialScoreCard";
 import { formatNaira } from "../lib/format";
 import { chartColors } from "../lib/chartTheme";
@@ -43,6 +44,7 @@ export default function Dashboard() {
   const { worker } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [logOrderOpen, setLogOrderOpen] = useState(false);
+  const [billPaymentOpen, setBillPaymentOpen] = useState(false);
   const [requestingPayout, setRequestingPayout] = useState(false);
   const [payoutError, setPayoutError] = useState("");
   const [confirmCode, setConfirmCode] = useState("");
@@ -117,6 +119,8 @@ export default function Dashboard() {
       <BalanceCard state={balanceState} onSettle={() => setModalOpen(true)} />
 
       <LogOrderCard onOpen={() => setLogOrderOpen(true)} />
+
+      <BillPaymentCard onOpen={() => setBillPaymentOpen(true)} balance={balanceState.data?.available ?? 0} />
 
       <PayoutRequestsCard
         payoutsState={payoutsState}
@@ -287,6 +291,12 @@ export default function Dashboard() {
         platform={worker?.platform}
         onLogged={handleOrderLogged}
       />
+      <BillPaymentModal
+        open={billPaymentOpen}
+        onClose={() => setBillPaymentOpen(false)}
+        balance={balanceState.data?.available ?? 0}
+        onPaid={() => Promise.all([balanceState.reload(), notifState.reload()])}
+      />
     </AppLayout>
   );
 }
@@ -307,6 +317,28 @@ function LogOrderCard({ onOpen }) {
       </div>
       <Button onClick={onOpen} className="shrink-0 px-6 py-2.5">
         Log Order
+      </Button>
+    </Card>
+  );
+}
+
+function BillPaymentCard({ onOpen, balance }) {
+  return (
+    <Card className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-4">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent-2/12 text-accent-2">
+          <Receipt className="h-5 w-5" strokeWidth={1.75} />
+        </span>
+        <div>
+          <p className="text-sm font-bold text-text-1">Pay a Bill</p>
+          <p className="mt-1 text-sm text-text-3">
+            Send rent, school fees, or other bills straight from your balance — paying the same recipient regularly
+            builds your score.
+          </p>
+        </div>
+      </div>
+      <Button variant="success" onClick={onOpen} disabled={!(balance > 0)} className="shrink-0 px-6 py-2.5">
+        Pay a Bill
       </Button>
     </Card>
   );
@@ -491,7 +523,12 @@ function BalanceCard({ state, onSettle }) {
           <p className="mt-2 text-xs text-text-3">Updated {state.data.updatedAt}</p>
         </div>
       </div>
-      <Button variant="success" onClick={onSettle} className="px-8 py-3.5">
+      <Button
+        variant="success"
+        onClick={onSettle}
+        disabled={!(state.data.available > 0)}
+        className="px-8 py-3.5"
+      >
         Transfer
       </Button>
     </Card>

@@ -66,9 +66,10 @@ above, that's a bug, not by design — the backend for everything else
 - **Auth** — email + password signup with an email-OTP verification step, login, session refresh.
 - **Onboarding** — a 4-step skippable wizard (personal/contact, bank details, security PIN, consent); a persistent nudge on Dashboard/Settings if it's incomplete.
 - **Dashboard** — available balance, a real Nomba transfer to the worker's bank ("Transfer" — choose any amount up to the available balance, not just the full amount), a live financial-score snapshot, and the **Payout Requests** flow (see below).
-- **Payout requests** — "Log a Completed Order" records a completed delivery or trip (a grid of realistic amount presets, or a custom one); "Request Payout" bundles every logged order into one request, which the worker must then confirm with a 6-digit code (sent by email and in-app notification) before an admin can act on it. An **Admin: Payouts** page (only visible to accounts with admin access) processes confirmed requests with an amount that can deliberately differ from what was requested, demonstrating matched/underpaid/overpaid/unmatched reconciliation. Any account can self-grant admin access from Settings — no separate admin login exists.
+- **Payout requests** — "Log a Completed Order" records a completed delivery or trip (a grid of realistic amount presets, or a custom one); "Request Payout" bundles every logged order into one request, which the worker must then confirm with a 6-digit code (sent by email and in-app notification) before an admin can act on it. An **Admin: Payouts** page (visible to every account — admin access is automatic, no separate login) processes confirmed requests with an amount that can deliberately differ from what was requested, demonstrating matched/underpaid/overpaid/unmatched reconciliation, including paying off an underpaid request's remaining balance later.
+- **Bill payments** — send part of the available balance to a third-party recipient under a category (rent/school fees/gym/other), with the recipient's real account name resolved via Nomba before any transfer. Paying the *same* recipient across 2+ different months builds a dedicated credit-score component — a one-off payment doesn't.
 - **Earnings** — weekly/monthly charts, stats, and a payout-request history table.
-- **Settlements** — history of real outbound transfers to the worker's bank.
+- **Settlements** — history of real outbound transfers to the worker's own bank, with a detail view per settlement.
 - **Financial Identity & Credit** (`/app/credit`) — score breakdown, identity progress tracker, verified income certificate, settlement reliability gauges, credit eligibility + request modal, and an educational credit-building guide.
 - **Settings** — profile/bank details and notification preferences. Admin access itself is automatic for every account, no toggle needed.
 - **Real in-app + email notifications** — a processed payout triggers both a real notification row (shown in the Dashboard's notification panel) and a real email (via Brevo, through the backend).
@@ -104,7 +105,7 @@ src/
 | `/app/settlements` | Settlements | Outbound transfer history |
 | `/app/credit` | Financial Identity & Credit | Score, certificate, credit request |
 | `/app/admin/payouts` | Admin: Payouts | Only reachable with admin access; redirects otherwise |
-| `/app/settings` | Settings | Profile, notification prefs, admin-access toggle |
+| `/app/settings` | Settings | Profile, notification prefs |
 | `/app/support` | Support | FAQ (static content) |
 
 ## Where this deviates from the original design
@@ -125,6 +126,16 @@ src/
   remains API-only). This is a different, later-added admin role scoped
   specifically to processing payout requests — see `server/README.md`'s
   "Two separate admin mechanisms" section.
+- **Admin access is automatic for every account**, per direct follow-up
+  instruction — the earlier self-service "Enable Admin Access" toggle in
+  Settings is gone entirely, along with the `POST /auth/become-admin`
+  endpoint that backed it.
+- **Transfers are a worker-chosen amount, not always the full balance** —
+  the button was also renamed from "Settle Now" to "Transfer" to match.
+- **Bill payments are a new feature** (send to a third party under a
+  category, not just settling to your own bank) with its own credit-score
+  effect — see `server/README.md`'s "Bill payments & the credit score"
+  section for how that's scored and why it's deliberately hard to game.
 
 See [`server/README.md`](server/README.md) for the backend's full API
 reference, the reconciliation model, and the complete deviations list.

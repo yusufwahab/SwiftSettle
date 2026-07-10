@@ -2,6 +2,7 @@ import { simulate } from "../core/simulate";
 
 const score = {
   score: 712,
+  max_score: 900,
   tier: "standard",
   components: {
     phone_verified: 50,
@@ -13,6 +14,7 @@ const score = {
     settlement_consistency: 100,
     earnings_trend: 50,
     time_to_settlement: 0,
+    responsible_bill_payments: 0,
   },
   days_until_certificate: 0,
   certificate_eligible: true,
