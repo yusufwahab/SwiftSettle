@@ -396,7 +396,12 @@ comment on table notifications is 'Real in-app notifications — previously this
 
 alter table payout_requests
   add column if not exists confirmation_code_hash varchar,
-  add column if not exists confirmation_code_expires_at timestamp,
+  -- timestamptz, not timestamp — this gets compared against `new Date()` in
+  -- JS (payoutRequestService.confirmPayoutRequest), and a plain `timestamp`
+  -- round-trips through PostgREST with no timezone marker, which JS then
+  -- misparses as local server time instead of UTC (see migration
+  -- 20260710000002 for the incident this was fixed after).
+  add column if not exists confirmation_code_expires_at timestamptz,
   add column if not exists confirmed_at timestamp;
 
 comment on column payout_requests.confirmation_code_hash is 'bcrypt hash of the 6-digit code sent via email + in-app notification when the request was created (or last resent). Never stored or returned in plaintext.';
