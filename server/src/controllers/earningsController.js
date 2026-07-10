@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const supabase = require("../config/database");
 const platformService = require("../services/platformService");
+const balanceService = require("../services/balanceService");
 const { computeNombaSignature } = require("../middleware/validateWebhook");
 const { generateReference, RECONCILED_EARNING_STATUSES } = require("../utils/helpers");
 const env = require("../config/env");
@@ -11,23 +12,15 @@ async function getBalance(req, res, next) {
   try {
     const workerId = req.worker.id;
 
-    // Only earnings actually reconciled against a real VA deposit count as
-    // spendable balance — a pending platform-reported order isn't money yet.
-    const [{ data: earnings, error: earningsError }, { data: settlements, error: settlementsError }] =
-      await Promise.all([
-        supabase
-          .from("earnings")
-          .select("received_amount, reconciled_at")
-          .eq("worker_id", workerId)
-          .in("status", RECONCILED_EARNING_STATUSES),
-        supabase.from("settlements").select("amount").eq("worker_id", workerId).eq("status", "completed"),
-      ]);
+    const [balance, { data: earnings, error: earningsError }] = await Promise.all([
+      balanceService.getAvailableBalance(workerId),
+      supabase
+        .from("earnings")
+        .select("received_amount, reconciled_at")
+        .eq("worker_id", workerId)
+        .in("status", RECONCILED_EARNING_STATUSES),
+    ]);
     if (earningsError) throw earningsError;
-    if (settlementsError) throw settlementsError;
-
-    const totalEarned = (earnings || []).reduce((sum, e) => sum + Number(e.received_amount), 0);
-    const totalSettled = (settlements || []).reduce((sum, s) => sum + Number(s.amount), 0);
-    const balance = totalEarned - totalSettled;
 
     const today = new Date().toISOString().slice(0, 10);
     const dailyTotal = (earnings || [])

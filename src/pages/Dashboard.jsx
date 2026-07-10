@@ -492,7 +492,7 @@ function BalanceCard({ state, onSettle }) {
         </div>
       </div>
       <Button variant="success" onClick={onSettle} className="px-8 py-3.5">
-        Settle Now
+        Transfer
       </Button>
     </Card>
   );

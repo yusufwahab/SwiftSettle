@@ -9,30 +9,15 @@ import Skeleton from "../components/ui/dark/Skeleton";
 import { ErrorState } from "../components/ui/dark/States";
 import { TextField, Toggle, Checkbox } from "../components/ui/dark/Field";
 import { useAuth } from "../context/AuthContext";
-import { preferencesService, authService } from "../services";
+import { preferencesService } from "../services";
 import { useAsync } from "../hooks/useAsync";
 
 export default function SettingsPage() {
-  const { worker, updateWorker } = useAuth();
+  const { worker } = useAuth();
   const [editingPersonal, setEditingPersonal] = useState(false);
   const [twoFA, setTwoFA] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
-  const [grantingAdmin, setGrantingAdmin] = useState(false);
-  const [adminError, setAdminError] = useState("");
-
-  const handleBecomeAdmin = async () => {
-    setAdminError("");
-    setGrantingAdmin(true);
-    try {
-      const result = await authService.becomeAdmin();
-      updateWorker(result);
-    } catch (err) {
-      setAdminError(err.message);
-    } finally {
-      setGrantingAdmin(false);
-    }
-  };
 
   const prefsState = useAsync(() => preferencesService.getNotifications(), []);
   const [notifs, setNotifs] = useState(null);
@@ -56,20 +41,6 @@ export default function SettingsPage() {
           </div>
           <Button as={Link} to="/app/onboarding" className="shrink-0 px-5 py-2.5">
             Continue Setup <ArrowRight className="h-4 w-4" strokeWidth={1.75} />
-          </Button>
-        </Card>
-      )}
-
-      {!worker?.isAdmin && (
-        <Card className="mb-6 border border-accent/25">
-          <p className="mb-1 text-sm font-bold text-text-1">Admin Access</p>
-          <p className="mb-4 text-sm text-text-3">
-            Grant your own account admin access to process payout requests from the Admin page — no separate
-            login, this just flips a flag on your account.
-          </p>
-          {adminError && <p className="mb-2 text-xs text-danger-vivid">{adminError}</p>}
-          <Button variant="outline" onClick={handleBecomeAdmin} disabled={grantingAdmin} className="px-5 py-2.5">
-            {grantingAdmin ? "Granting…" : "Enable Admin Access"}
           </Button>
         </Card>
       )}

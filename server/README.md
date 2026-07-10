@@ -23,7 +23,7 @@ several later deviations made by direct follow-up instruction — see
    npm start        # production
    ```
 6. Confirm it's up: `curl http://localhost:5000/health`
-7. **Make your own account an admin** once you've signed up through the frontend: `POST /api/auth/become-admin` (bearer token, no body) — or just click "Enable Admin Access" in the frontend's Settings page. No separate admin login exists; it's a flag on your own worker row (see "Payout requests & the admin role" below).
+7. **Admin access is automatic** — every worker (`workers.is_admin` defaults `true`) can see and process every payout request, no separate login or self-service step (see "Payout requests & the admin role" below). This is a deliberate simplification for single-tenant demo use, not a real multi-tenant access model.
 
 ## Running without every credential
 
@@ -72,7 +72,6 @@ require the calling worker's `is_admin` flag to be `true`.
 | POST | `/refresh-token` | Rotate access token |
 | POST | `/logout` | Revoke refresh token |
 | GET | `/me` | Current worker profile |
-| POST | `/become-admin` | Self-service — flips `is_admin` on your own account |
 
 **Earnings** (`/api/earnings`)
 | Method | Path | Purpose |
@@ -206,8 +205,11 @@ Processing a request:
 
 **Two separate admin mechanisms exist, deliberately:**
 - `workers.is_admin` + `requireAdmin` middleware — gates the payout-request
-  admin endpoints and the frontend's Admin page. Same login as any worker;
-  self-service via `POST /auth/become-admin`. No separate admin auth system.
+  admin endpoints and the frontend's Admin page. Defaults to `true` for
+  every worker (no self-service toggle, no separate admin auth system) —
+  a deliberate simplification for single-tenant demo use; a real
+  multi-tenant product would need this to be a real per-account grant, not
+  a blanket default.
 - `ADMIN_API_KEY` + `x-admin-key` header — gates only `GET /api/admin/behavioral-analytics`,
   an internal/API-only endpoint from `updatedPrompt.md` with no UI. Predates
   the payout-request admin role and serves a different purpose (an

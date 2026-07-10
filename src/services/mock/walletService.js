@@ -28,16 +28,36 @@ export const walletService = {
     return simulate({ ...currentWorker.bank }, { delay: 400 });
   },
 
-  async settle() {
+  // Worker chooses how much to transfer, not necessarily the full balance.
+  // Deducted from the shared balanceSummary immediately (on the success
+  // path only) so getBalance() reflects it on the very next call, same as
+  // the live backend now does — not a stagnant number until some later
+  // webhook confirms it.
+  async settle(amount) {
+    const requested = Number(amount) || 0;
+    if (requested <= 0) {
+      return Promise.reject(new Error("Enter an amount greater than zero."));
+    }
+    if (requested > balanceSummary.available) {
+      return Promise.reject(new Error(`Available balance is only ₦${balanceSummary.available.toLocaleString()}.`));
+    }
+
     // A visible failure path is part of the spec (Settlement Failed state),
-    // so a slice of attempts intentionally reject.
+    // so a slice of attempts intentionally reject — decided up front so a
+    // failed transfer never deducts the balance.
+    const willFail = Math.random() < 0.2;
+    if (!willFail) {
+      balanceSummary.available = Math.round((balanceSummary.available - requested) * 100) / 100;
+      balanceSummary.updatedAt = "just now";
+    }
+
     return simulate(
       {
-        amount: balanceSummary.available,
+        amount: requested,
         reference: `SW-2026-${Math.floor(100000 + Math.random() * 900000)}`,
         bank: currentWorker.bank.name,
       },
-      { delay: 2200, failRate: 0.2 }
+      { delay: 2200, failRate: willFail ? 1 : 0 }
     );
   },
 };

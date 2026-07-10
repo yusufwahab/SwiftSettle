@@ -1,25 +1,18 @@
 const supabase = require("../config/database");
 const nombaService = require("../services/nombaService");
+const balanceService = require("../services/balanceService");
 const { generateReference } = require("../utils/helpers");
 const { ApiError } = require("../middleware/errorHandler");
 
-async function getAvailableBalance(workerId) {
-  const [{ data: earnings }, { data: settlements }] = await Promise.all([
-    supabase.from("earnings").select("amount").eq("worker_id", workerId),
-    supabase.from("settlements").select("amount").eq("worker_id", workerId).in("status", ["completed", "processing", "pending"]),
-  ]);
-  const totalEarned = (earnings || []).reduce((sum, e) => sum + Number(e.amount), 0);
-  const totalCommitted = (settlements || []).reduce((sum, s) => sum + Number(s.amount), 0);
-  return totalEarned - totalCommitted;
-}
-
-// POST /api/settlements/create
+// POST /api/settlements/create — { amount }. The worker chooses how much of
+// their available balance to transfer; it doesn't have to be the full
+// amount (a partial transfer just leaves the rest available for later).
 async function createSettlement(req, res, next) {
   try {
     const worker = req.worker;
     const { amount } = req.body;
 
-    const available = await getAvailableBalance(worker.id);
+    const available = await balanceService.getAvailableBalance(worker.id);
     if (amount > available) {
       throw new ApiError(422, "insufficient_balance", `Available balance is only ₦${available.toLocaleString()}.`);
     }
@@ -126,4 +119,4 @@ async function getHistory(req, res, next) {
   }
 }
 
-module.exports = { createSettlement, getStatus, getHistory, getAvailableBalance };
+module.exports = { createSettlement, getStatus, getHistory };

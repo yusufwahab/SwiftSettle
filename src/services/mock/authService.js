@@ -44,6 +44,7 @@ export const authService = {
           financialScore: 0,
           creditTier: "none",
           identityVerificationStatus: "pending",
+          isAdmin: true,
           twoFactorEnabled: false,
           onboardingStep: 1,
           onboardingCompletedAt: null,
@@ -62,10 +63,6 @@ export const authService = {
       { worker: { ...currentWorker, email }, token: "mock_session_token" },
       { delay: 700 }
     );
-  },
-
-  async becomeAdmin() {
-    return simulate({ isAdmin: true }, { delay: 400 });
   },
 
   async logout() {

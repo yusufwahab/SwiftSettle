@@ -170,7 +170,7 @@ export const faqCategories = [
       },
       {
         q: "When are earnings settled?",
-        a: "Whenever you choose. Tap “Settle Now” and the transfer to your bank account is initiated immediately.",
+        a: "Whenever you choose. Tap “Transfer”, choose how much of your balance to send, and it's initiated immediately.",
       },
       {
         q: "Can I settle whenever I want?",

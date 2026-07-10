@@ -13,6 +13,5 @@ router.post("/complete-signup", requireAuth, validate("completeSignup"), authCon
 router.post("/refresh-token", validate("refreshToken"), authController.refreshToken);
 router.post("/logout", authController.logout);
 router.get("/me", requireAuth, authController.getMe);
-router.post("/become-admin", requireAuth, authController.becomeAdmin);
 
 module.exports = router;

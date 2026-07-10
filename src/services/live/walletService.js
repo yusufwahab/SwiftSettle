@@ -64,15 +64,19 @@ export const walletService = {
     };
   },
 
-  async settle() {
-    const balance = await walletService.getBalance();
+  // Worker chooses how much to transfer — doesn't have to be the full
+  // available balance. The backend validates it against the real available
+  // balance itself (balanceService.getAvailableBalance), so this is just
+  // passing through what the worker picked, not re-deriving/trusting a
+  // client-side number.
+  async settle(amount) {
     const { worker } = await apiRequest("/auth/me", { method: "GET" });
 
     const result = await apiRequest("/settlements/create", {
       method: "POST",
-      body: { amount: balance.available },
+      body: { amount },
     });
 
-    return { amount: balance.available, reference: result.reference, bank: worker.bank_name };
+    return { amount, reference: result.reference, bank: worker.bank_name };
   },
 };

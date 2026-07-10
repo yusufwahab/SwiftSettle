@@ -65,12 +65,12 @@ above, that's a bug, not by design — the backend for everything else
 
 - **Auth** — email + password signup with an email-OTP verification step, login, session refresh.
 - **Onboarding** — a 4-step skippable wizard (personal/contact, bank details, security PIN, consent); a persistent nudge on Dashboard/Settings if it's incomplete.
-- **Dashboard** — available balance, real Nomba settlement ("Settle Now"), a live financial-score snapshot, and the **Payout Requests** flow (see below).
+- **Dashboard** — available balance, a real Nomba transfer to the worker's bank ("Transfer" — choose any amount up to the available balance, not just the full amount), a live financial-score snapshot, and the **Payout Requests** flow (see below).
 - **Payout requests** — "Log a Completed Order" records a completed delivery or trip (a grid of realistic amount presets, or a custom one); "Request Payout" bundles every logged order into one request, which the worker must then confirm with a 6-digit code (sent by email and in-app notification) before an admin can act on it. An **Admin: Payouts** page (only visible to accounts with admin access) processes confirmed requests with an amount that can deliberately differ from what was requested, demonstrating matched/underpaid/overpaid/unmatched reconciliation. Any account can self-grant admin access from Settings — no separate admin login exists.
 - **Earnings** — weekly/monthly charts, stats, and a payout-request history table.
 - **Settlements** — history of real outbound transfers to the worker's bank.
 - **Financial Identity & Credit** (`/app/credit`) — score breakdown, identity progress tracker, verified income certificate, settlement reliability gauges, credit eligibility + request modal, and an educational credit-building guide.
-- **Settings** — profile/bank details, notification preferences, and the admin-access self-service toggle.
+- **Settings** — profile/bank details and notification preferences. Admin access itself is automatic for every account, no toggle needed.
 - **Real in-app + email notifications** — a processed payout triggers both a real notification row (shown in the Dashboard's notification panel) and a real email (via Brevo, through the backend).
 
 ## Project structure
@@ -98,7 +98,7 @@ src/
 |---|---|---|
 | `/` | Landing | Public marketing page |
 | `/login`, `/signup` | Auth | Public |
-| `/app/dashboard` | Dashboard | Balance, Settle Now, Payout Requests, financial-score snapshot |
+| `/app/dashboard` | Dashboard | Balance, Transfer, Payout Requests, financial-score snapshot |
 | `/app/onboarding` | Onboarding wizard | 4 steps, skippable |
 | `/app/earnings` | Earnings | Charts + payout-request history |
 | `/app/settlements` | Settlements | Outbound transfer history |

@@ -38,13 +38,6 @@ export const authService = {
     return { worker: normalizeWorker(me.worker), token: data.token };
   },
 
-  // Self-service demo toggle — see server/src/controllers/authController.js's
-  // becomeAdmin for why this has no separate admin signup flow.
-  async becomeAdmin() {
-    await apiRequest("/auth/become-admin", { method: "POST" });
-    return { isAdmin: true };
-  },
-
   async logout() {
     const refreshToken = tokenStorage.getRefresh();
     tokenStorage.clear();

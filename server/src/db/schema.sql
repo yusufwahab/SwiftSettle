@@ -333,7 +333,7 @@ comment on column earnings.nomba_transaction_id is 'Nomba transaction ID from th
 -- table (previously 100% mocked even in live mode).
 
 alter table workers
-  add column if not exists is_admin boolean not null default false;
+  add column if not exists is_admin boolean not null default true;
 
 create table if not exists payout_requests (
   id uuid primary key default uuid_generate_v4(),
@@ -378,7 +378,7 @@ create index if not exists idx_notifications_worker on notifications(worker_id, 
 alter table payout_requests enable row level security;
 alter table notifications enable row level security;
 
-comment on column workers.is_admin is 'Flags a worker account as staff — same login, no separate admin auth system. Gates /api/payouts admin endpoints and the sidebar Admin nav item.';
+comment on column workers.is_admin is 'Every worker is an admin automatically (default true) — no self-service toggle exists anymore. Gates /api/payouts admin endpoints and the sidebar Admin nav item.';
 comment on table payout_requests is 'A worker-initiated request to be paid for bundled pending earnings. Reconciled unit is the request itself (one requested_total, one received_amount) — not each underlying earning individually, to avoid proportional-split complexity at the matching layer.';
 comment on column earnings.payout_request_id is 'Set when a pending earning is bundled into a payout request. Earnings keep their own received_amount/status too (set pro-rata once the request resolves) so balance/scoring queries need no special-casing.';
 comment on table notifications is 'Real in-app notifications — previously this was mocked even in live mode.';
