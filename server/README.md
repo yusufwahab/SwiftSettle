@@ -80,8 +80,8 @@ require the calling worker's `is_admin` flag to be `true`.
 | GET | `/balance` | Available balance, today's total, trend (reconciled earnings only) |
 | GET | `/history` | Paginated earnings list (`status`, `amount` vs `received_amount`) |
 | GET | `/daily` | Day-bucketed totals for charts |
-| POST | `/simulate` | Demo: reports a fake completed order (pending, not yet paid) |
-| POST | `/simulate-payment` | Demo: simulates the payment landing directly (see "Reconciliation" below) |
+| POST | `/simulate` | Records a completed order (pending, not yet paid) — route name is a holdover from before the frontend called this "Log a Completed Order" |
+| POST | `/simulate-payment` | Settles the payment for a logged order directly (see "Reconciliation" below) |
 
 **Settlements** (`/api/settlements`) — outbound VA-balance → bank transfer, worker-initiated, unrelated to payout requests
 | Method | Path | Purpose |
@@ -93,10 +93,12 @@ require the calling worker's `is_admin` flag to be `true`.
 **Payout requests** (`/api/payouts`) — the inbound "get paid for completed work" flow
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/request` | Worker bundles every pending earning into one request |
+| POST | `/request` | Worker bundles every pending earning into one request; sends a confirmation code by email + notification |
 | GET | `/mine` | Worker's own requests, with bundled earnings |
+| POST | `/:id/confirm` | Worker submits the code — required before an admin can process the request |
+| POST | `/:id/resend-code` | Issues and sends a fresh code if the first expired |
 | GET | `/all` **(admin)** | Every worker's requests |
-| POST | `/:id/process` **(admin)** | Pay a request — amount can deliberately differ from what was requested |
+| POST | `/:id/process` **(admin)** | Pay a request — blocked until `confirmed_at` is set; amount can deliberately differ from what was requested |
 
 **Financial identity** (`/api/financial`)
 | Method | Path | Purpose |
@@ -161,11 +163,22 @@ the deposit's origin is synthetic.
 
 ## Payout requests & the admin role
 
-The worker-facing loop: complete some (simulated) orders → **Request
-Payout** bundles every currently-pending order into one `payout_requests`
-row with a single `requested_total`. An admin — any worker account with
-`is_admin = true` — sees it in the queue and **processes** it with an amount
-that can deliberately differ from what was requested, producing the same
+The worker-facing loop: log some completed orders → **Request Payout**
+bundles every currently-pending order into one `payout_requests` row with a
+single `requested_total`. This also generates a 6-digit confirmation code
+(bcrypt-hashed on the row, 15-minute expiry) and delivers it two ways —
+email and a real in-app notification — since no SMS provider is configured
+for this build. The worker must enter that code back via
+`POST /payouts/:id/confirm` before an admin can act on the request at all;
+`processPayoutRequest` checks `confirmed_at is not null` before doing
+anything else, and `POST /payouts/:id/resend-code` issues a fresh one if the
+first expires. This is a 2FA-style check that the account owner actually
+meant to submit the request — not proof the underlying work happened, which
+still requires a real platform integration (see the deviations list).
+
+Once confirmed, an admin — any worker account with `is_admin = true` — sees
+it in the queue and **processes** it with an amount that can deliberately
+differ from what was requested, producing the same
 `matched`/`underpaid`/`overpaid` vocabulary. Reconciling at the request
 level (not per-order) avoids proportional-split complexity in the matching
 logic itself; the actual amount received is then distributed back across
@@ -202,6 +215,7 @@ Both `updatedPrompt.md` and `BackendPrompt.md` describe the system at a level th
 - **`workers.bank_code` added, and every settlement/transfer call uses it instead of `bank_name`.** Nomba's Transfer API requires a numeric CBN bank code (3 or 6 digits); the original onboarding flow only ever collected a bank *name* from a static list, which is not a valid `bankCode` and produced a real `422` in testing. `GET /api/banks` (Nomba's own directory) now backs the onboarding bank dropdown so both are captured together.
 - **`earnings.status`, `received_amount`, `nomba_transaction_id`, `reconciled_at`, `payout_request_id` added** — see "Reconciliation" above. The literal schema treats an earning as instantly-real money; that doesn't reflect how a dedicated virtual account actually gets funded.
 - **`payout_requests` and `notifications` tables added**, plus `workers.is_admin` — none of this exists in either prompt. Added per direct follow-up instruction to give workers a way to actively request payment for completed work and give a lightweight admin role a way to act on it, with real (not mocked) notifications of the outcome.
+- **`payout_requests` confirmation-code columns added** (`confirmation_code_hash`, `confirmation_code_expires_at`, `confirmed_at`) — per direct follow-up instruction, gates admin processing behind a code the worker enters back into the app. No SMS provider (Termii or similar) is configured for this build, so the code is delivered over email + in-app notification instead of a dedicated SMS channel.
 - **`GET /auth/me` added.** Nothing else returns the logged-in worker's own profile — needed for the frontend sidebar/settings page to render at all.
 - **Nomba webhook signature verification uses Nomba's real scheme** (a specific field concatenation, HMAC-SHA256, Base64), verified against `developer.nomba.com` — not the generic raw-body-HMAC pattern either prompt's phrasing might suggest. The Joi schema for it originally required a field named `event`; Nomba's real payload field is `event_type` — fixed, since the mismatch would have 400'd every real webhook before it reached the handler.
 - **Available-credit formula, interest rate application, and credit-tier score bands are inferred**, not given as exact formulas anywhere — see comments in `creditController.js` and `scoringService.js`.

@@ -118,13 +118,13 @@ async function simulateEarning(req, res, next) {
 
     await platformService.recordEarning({
       workerId: worker.id,
-      platform: worker.platform || "Demo Platform",
-      orderId: generateReference("DEMO"),
+      platform: worker.platform || "Independent",
+      orderId: generateReference("ORDER"),
       amount,
-      description: "Simulated delivery (demo)",
+      description: "Completed order",
     });
 
-    res.json({ simulated: true, amount });
+    res.json({ logged: true, amount });
   } catch (err) {
     next(err);
   }
@@ -210,8 +210,8 @@ async function simulateCustomerPayment(req, res, next) {
           responseCode: "00",
         },
         customer: {
-          senderName: "Demo Payer",
-          bankName: "Demo Bank",
+          senderName: "Customer Payment",
+          bankName: "Partner Bank",
           accountNumber: "0000000000",
           bankCode: "000",
         },

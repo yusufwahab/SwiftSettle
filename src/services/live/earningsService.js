@@ -88,21 +88,22 @@ export const earningsService = {
 
   // No real gig-platform partner is wired up yet — nothing ever calls
   // POST /webhooks/platform for a real order. This lets a logged-in worker
-  // record one simulated completed delivery on their own account (via
-  // POST /earnings/simulate, which goes through the same recordEarning()
-  // path a real webhook would) instead of a developer hand-inserting rows
-  // in Supabase for every worker who wants to see the settlement flow work.
-  async simulate() {
-    return apiRequest("/earnings/simulate", { method: "POST" });
+  // record a completed delivery on their own account (via POST
+  // /earnings/simulate — route name is a holdover, the behavior is real:
+  // it goes through the same recordEarning() path an actual platform
+  // webhook would) instead of a developer hand-inserting rows in Supabase
+  // for every worker who wants to see the settlement flow work.
+  async log({ amount } = {}) {
+    return apiRequest("/earnings/simulate", { method: "POST", body: { amount } });
   },
 
-  // Step 2 of the demo flow — simulates the actual payment landing in the
-  // worker's Nomba virtual account (see server/src/controllers/
-  // earningsController.js's simulateCustomerPayment for why this can't just
-  // be a real Nomba sandbox deposit). Passing an amount that differs from
-  // the pending order's expected amount is how under/overpayment gets
-  // demonstrated, not a misuse of the endpoint.
-  async simulatePayment({ amount, earningId } = {}) {
+  // The other half of that flow — settles the *payment* for a logged order
+  // (see server/src/controllers/earningsController.js's
+  // simulateCustomerPayment for why this can't just be a real Nomba sandbox
+  // deposit). Passing an amount that differs from the order's expected
+  // amount is how under/overpayment gets demonstrated, not a misuse of the
+  // endpoint.
+  async settlePayment({ amount, earningId } = {}) {
     return apiRequest("/earnings/simulate-payment", {
       method: "POST",
       body: { amount, earning_id: earningId },

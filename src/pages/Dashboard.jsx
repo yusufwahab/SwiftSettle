@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Wallet, TrendingUp, Clock, CalendarDays, Building2, Bell, Mail, MessageCircle, Phone,
-  CheckCircle2, Info, AlertTriangle, ShieldAlert, ArrowRight, XCircle,
+  CheckCircle2, Info, AlertTriangle, ShieldAlert, ArrowRight, XCircle, ClipboardCheck, KeyRound,
 } from "lucide-react";
 import { AreaChart, Area, ResponsiveContainer, YAxis } from "recharts";
 import { Link } from "react-router-dom";
@@ -11,7 +11,9 @@ import Button from "../components/ui/dark/Button";
 import Badge from "../components/ui/dark/Badge";
 import Skeleton from "../components/ui/dark/Skeleton";
 import { ErrorState, EmptyState } from "../components/ui/dark/States";
+import { TextField } from "../components/ui/dark/Field";
 import SettlementModal from "../components/SettlementModal";
+import LogOrderModal from "../components/LogOrderModal";
 import FinancialScoreCard from "../components/FinancialScoreCard";
 import { formatNaira } from "../lib/format";
 import { chartColors } from "../lib/chartTheme";
@@ -40,10 +42,14 @@ const OPEN_STATUSES = ["pending", "requested"];
 export default function Dashboard() {
   const { worker } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
-  const [simulating, setSimulating] = useState(false);
-  const [simulateError, setSimulateError] = useState("");
+  const [logOrderOpen, setLogOrderOpen] = useState(false);
   const [requestingPayout, setRequestingPayout] = useState(false);
   const [payoutError, setPayoutError] = useState("");
+  const [confirmCode, setConfirmCode] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState("");
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
   const balanceState = useAsync(() => walletService.getBalance(), []);
   const activityState = useAsync(() => walletService.getTodayActivity(), []);
   const paymentState = useAsync(() => walletService.getPaymentMethod(), []);
@@ -52,39 +58,56 @@ export default function Dashboard() {
   const scoreState = useAsync(() => financialService.getScore(), []);
   const payoutsState = useAsync(() => payoutsService.mine(), []);
 
-  // No real gig-platform partner is wired up yet, so nothing ever records a
-  // real earning on its own. This lets any onboarded worker add one
-  // themselves — no developer/SQL required — then refreshes the views that
-  // would change as a result.
-  const handleSimulateDelivery = async () => {
-    setSimulateError("");
-    setSimulating(true);
-    try {
-      await earningsService.simulate();
-      await Promise.all([balanceState.reload(), activityState.reload(), weeklyState.reload()]);
-    } catch (err) {
-      setSimulateError(err.message);
-    } finally {
-      setSimulating(false);
-    }
+  const handleOrderLogged = () => {
+    Promise.all([balanceState.reload(), activityState.reload(), weeklyState.reload()]);
   };
 
   const pendingOrders = activityState.data?.filter((row) => row.status === "pending") || [];
   const pendingTotal = pendingOrders.reduce((sum, row) => sum + row.amount, 0);
 
   // Doesn't move money itself — bundles every pending order into one
-  // request an admin has to process. The actual money movement (and the
-  // matched/underpaid/overpaid outcome) happens on the Admin page.
+  // request an admin has to process. Creating the request also sends a
+  // confirmation code (email + in-app notification); the admin can't act on
+  // it until that code is entered back in below.
   const handleRequestPayout = async () => {
     setPayoutError("");
     setRequestingPayout(true);
     try {
       await payoutsService.request();
-      await Promise.all([activityState.reload(), payoutsState.reload()]);
+      await Promise.all([activityState.reload(), payoutsState.reload(), notifState.reload()]);
     } catch (err) {
       setPayoutError(err.message);
     } finally {
       setRequestingPayout(false);
+    }
+  };
+
+  const handleConfirmCode = async (id) => {
+    setConfirmError("");
+    setConfirming(true);
+    try {
+      await payoutsService.confirm(id, confirmCode);
+      setConfirmCode("");
+      await payoutsState.reload();
+    } catch (err) {
+      setConfirmError(err.message);
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  const handleResendCode = async (id) => {
+    setResendMessage("");
+    setConfirmError("");
+    setResending(true);
+    try {
+      await payoutsService.resendCode(id);
+      setResendMessage("A new code has been sent — check your email or notifications.");
+      await notifState.reload();
+    } catch (err) {
+      setConfirmError(err.message);
+    } finally {
+      setResending(false);
     }
   };
 
@@ -93,6 +116,8 @@ export default function Dashboard() {
       {!worker?.onboardingCompletedAt && <OnboardingNudge step={worker?.onboardingStep} />}
       <BalanceCard state={balanceState} onSettle={() => setModalOpen(true)} />
 
+      <LogOrderCard onOpen={() => setLogOrderOpen(true)} />
+
       <PayoutRequestsCard
         payoutsState={payoutsState}
         pendingOrders={pendingOrders}
@@ -100,6 +125,14 @@ export default function Dashboard() {
         onRequestPayout={handleRequestPayout}
         requesting={requestingPayout}
         error={payoutError}
+        confirmCode={confirmCode}
+        onConfirmCodeChange={setConfirmCode}
+        onConfirmCode={handleConfirmCode}
+        confirming={confirming}
+        confirmError={confirmError}
+        onResendCode={handleResendCode}
+        resending={resending}
+        resendMessage={resendMessage}
       />
 
       <div className="mt-5">
@@ -144,16 +177,10 @@ export default function Dashboard() {
         <Card className="lg:col-span-2">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-sm font-bold text-text-1">Today's Activity</p>
-            <button
-              type="button"
-              onClick={handleSimulateDelivery}
-              disabled={simulating}
-              className="text-xs text-accent hover:text-accent-dark disabled:opacity-50"
-            >
-              {simulating ? "Adding…" : "+ Simulate Delivery (Demo)"}
-            </button>
+            <Link to="/app/earnings" className="text-xs text-accent hover:text-accent-dark">
+              View all →
+            </Link>
           </div>
-          {simulateError && <p className="mb-2 text-xs text-danger-vivid">{simulateError}</p>}
           {activityState.status === "loading" && (
             <div className="space-y-3 py-3">
               <Skeleton className="h-5" />
@@ -254,7 +281,34 @@ export default function Dashboard() {
         balance={balanceState.data?.available ?? 0}
         onSettled={balanceState.reload}
       />
+      <LogOrderModal
+        open={logOrderOpen}
+        onClose={() => setLogOrderOpen(false)}
+        platform={worker?.platform}
+        onLogged={handleOrderLogged}
+      />
     </AppLayout>
+  );
+}
+
+function LogOrderCard({ onOpen }) {
+  return (
+    <Card className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-4">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/12 text-accent">
+          <ClipboardCheck className="h-5 w-5" strokeWidth={1.75} />
+        </span>
+        <div>
+          <p className="text-sm font-bold text-text-1">Log a Completed Order</p>
+          <p className="mt-1 text-sm text-text-3">
+            Record a delivery or trip you've finished — it's added to Today's Activity, ready to request payout.
+          </p>
+        </div>
+      </div>
+      <Button onClick={onOpen} className="shrink-0 px-6 py-2.5">
+        Log Order
+      </Button>
+    </Card>
   );
 }
 
@@ -279,9 +333,25 @@ function OnboardingNudge({ step }) {
 // Always visible (unlike a conditional banner buried in another card) so
 // the worker-requests → admin-processes flow has one obvious home instead
 // of only appearing once you already have a pending order.
-function PayoutRequestsCard({ payoutsState, pendingOrders, pendingTotal, onRequestPayout, requesting, error }) {
+function PayoutRequestsCard({
+  payoutsState,
+  pendingOrders,
+  pendingTotal,
+  onRequestPayout,
+  requesting,
+  error,
+  confirmCode,
+  onConfirmCodeChange,
+  onConfirmCode,
+  confirming,
+  confirmError,
+  onResendCode,
+  resending,
+  resendMessage,
+}) {
   const openRequest = payoutsState.data?.find((r) => r.status === "requested");
   const lastProcessed = payoutsState.data?.find((r) => r.status !== "requested");
+  const needsConfirmation = openRequest && !openRequest.confirmed_at;
 
   return (
     <Card className="mt-5 border border-accent/20">
@@ -299,12 +369,61 @@ function PayoutRequestsCard({ payoutsState, pendingOrders, pendingTotal, onReque
 
       {payoutsState.status === "success" && (
         <div className="mt-3">
-          {openRequest ? (
+          {needsConfirmation ? (
+            <div className="rounded-xl bg-accent/8 p-4">
+              <div className="flex items-start gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
+                  <KeyRound className="h-4 w-4" strokeWidth={1.75} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-text-1">
+                    Confirm your request for {formatNaira(openRequest.requested_total)}
+                  </p>
+                  <p className="mt-1 text-xs text-text-3">
+                    We sent a 6-digit code to your email and your notifications — enter it below to send this to
+                    an admin for processing.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <TextField
+                  value={confirmCode}
+                  onChange={(e) => onConfirmCodeChange(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="123456"
+                  inputMode="numeric"
+                  className="flex-1"
+                />
+                <Button
+                  variant="success"
+                  onClick={() => onConfirmCode(openRequest.id)}
+                  disabled={confirming || confirmCode.length !== 6}
+                  className="shrink-0 px-4 py-2 text-sm sm:w-auto"
+                >
+                  {confirming ? "Confirming…" : "Confirm Request"}
+                </Button>
+              </div>
+              <div className="mt-2 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => onResendCode(openRequest.id)}
+                  disabled={resending}
+                  className="text-xs text-accent hover:text-accent-dark disabled:opacity-50"
+                >
+                  {resending ? "Sending…" : "Resend code"}
+                </button>
+                <a href="#notifications" className="text-xs text-text-3 hover:text-text-2">
+                  Check notifications
+                </a>
+              </div>
+              {resendMessage && <p className="mt-2 text-xs text-accent-2">{resendMessage}</p>}
+              {confirmError && <p className="mt-2 text-xs text-danger-vivid">{confirmError}</p>}
+            </div>
+          ) : openRequest ? (
             <div className="flex items-center justify-between gap-3 rounded-xl bg-accent/8 p-3">
               <p className="text-sm text-text-2">
-                Payout request of {formatNaira(openRequest.requested_total)} sent — awaiting admin review.
+                Payout request of {formatNaira(openRequest.requested_total)} confirmed — awaiting admin review.
               </p>
-              <Badge tone="primary">requested</Badge>
+              <Badge tone="success">confirmed</Badge>
             </div>
           ) : pendingOrders.length > 0 ? (
             <div className="flex items-center justify-between gap-3 rounded-xl bg-accent/8 p-3">
@@ -324,11 +443,11 @@ function PayoutRequestsCard({ payoutsState, pendingOrders, pendingTotal, onReque
           ) : (
             <EmptyState
               title="No completed orders yet"
-              message="Simulate a delivery below, then come back here to request payout — that's what alerts the admin to pay you."
+              message="Log a completed order above, then come back here to request payout — that's what alerts the admin to pay you."
               className="py-6"
             />
           )}
-          {error && <p className="mt-2 text-xs text-danger-vivid">{error}</p>}
+          {!needsConfirmation && error && <p className="mt-2 text-xs text-danger-vivid">{error}</p>}
           {lastProcessed && (
             <p className="mt-3 text-xs text-text-3">
               Last payout: {formatNaira(lastProcessed.received_amount)} received of{" "}
@@ -407,7 +526,7 @@ function StatCard({ icon: Icon, tone, label, value, loading, footer }) {
 function RightRail({ notifState }) {
   return (
     <>
-      <Card>
+      <Card id="notifications">
         <div className="mb-3 flex items-center justify-between">
           <p className="text-sm font-bold text-text-1">Notifications</p>
           <Bell className="h-4 w-4 text-text-3" strokeWidth={1.75} />

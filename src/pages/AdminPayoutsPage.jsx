@@ -67,13 +67,17 @@ export default function AdminPayoutsPage() {
                   </p>
                 </div>
                 <span className="shrink-0 font-medium text-text-1">{formatNaira(r.requested_total)}</span>
-                <button
-                  type="button"
-                  onClick={() => setTarget(r)}
-                  className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-dark"
-                >
-                  Process
-                </button>
+                {r.confirmed_at ? (
+                  <button
+                    type="button"
+                    onClick={() => setTarget(r)}
+                    className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-dark"
+                  >
+                    Process
+                  </button>
+                ) : (
+                  <Badge tone="neutral">Awaiting worker confirmation</Badge>
+                )}
               </div>
             ))}
           </div>

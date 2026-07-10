@@ -3,9 +3,9 @@ import { weeklyEarnings, monthlyEarnings, earningsStats, performanceMetrics } fr
 
 // Mirrors the live backend's two-step reconciliation model (pending order ->
 // matched/underpaid/overpaid once "paid") closely enough that the mock
-// layer's Simulate Delivery / Simulate Payment buttons behave the same way
-// the real Nomba-backed flow does, without needing a server. Module-level
-// state so walletService.getTodayActivity() (mock) can read the same list.
+// layer's Log Order / settlePayment methods behave the same way the real
+// Nomba-backed flow does, without needing a server. Module-level state so
+// walletService.getTodayActivity() (mock) can read the same list.
 const mockOrders = [];
 let orderSeq = 1;
 
@@ -26,23 +26,23 @@ export const earningsService = {
     return simulate({ ...performanceMetrics }, { delay: 500 });
   },
 
-  // Step 1 of the demo flow: reports a new pending order, same as a real
-  // platform webhook would — doesn't credit balance yet.
-  async simulate() {
-    const amount = Math.round((800 + Math.random() * 2200) / 50) * 50;
+  // Step 1: records a new pending order, same as a real platform webhook
+  // would — doesn't credit balance yet.
+  async log({ amount } = {}) {
+    const orderAmount = Number(amount) || Math.round((800 + Math.random() * 2200) / 50) * 50;
     mockOrders.push({
       id: `mock-order-${orderSeq++}`,
-      label: "Delivery completed",
-      amount,
+      label: "Completed order",
+      amount: orderAmount,
       status: "pending",
       recordedAt: new Date().toISOString(),
     });
-    return simulate({ simulated: true, amount }, { delay: 500 });
+    return simulate({ logged: true, amount: orderAmount }, { delay: 500 });
   },
 
-  // Step 2: simulates the customer/platform payment actually landing —
-  // matches against the target order and can deliberately over/underpay.
-  async simulatePayment({ amount, earningId } = {}) {
+  // Step 2: settles the payment for a logged order — matches against the
+  // target order and can deliberately over/underpay.
+  async settlePayment({ amount, earningId } = {}) {
     const target = earningId
       ? mockOrders.find((o) => o.id === earningId && o.status === "pending")
       : mockOrders.find((o) => o.status === "pending");
@@ -61,13 +61,13 @@ export const earningsService = {
     }
 
     return simulate(
-      { simulated: true, amount: payAmount, expected_amount: target?.amount ?? null, status },
+      { settled: true, amount: payAmount, expected_amount: target?.amount ?? null, status },
       { delay: 900 }
     );
   },
 
   // Internal — read by mock/walletService.getTodayActivity() to merge
-  // demo-created orders into the activity feed.
+  // logged orders into the activity feed.
   getMockOrders() {
     return mockOrders;
   },

@@ -9,6 +9,8 @@ router.use(requireAuth);
 
 router.post("/request", payoutsController.createPayoutRequest);
 router.get("/mine", payoutsController.listMine);
+router.post("/:id/confirm", validate("confirmPayoutRequest"), payoutsController.confirm);
+router.post("/:id/resend-code", payoutsController.resendCode);
 
 router.get("/all", requireAdmin, payoutsController.listAll);
 router.post("/:id/process", requireAdmin, validate("processPayout"), payoutsController.process);

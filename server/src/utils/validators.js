@@ -75,6 +75,10 @@ const schemas = {
     amount: Joi.number().positive().required(),
   }),
 
+  confirmPayoutRequest: Joi.object({
+    code: Joi.string().length(6).pattern(/^[0-9]+$/).required(),
+  }),
+
   platformWebhook: Joi.object({
     order_id: Joi.string().required(),
     worker_id: Joi.string().uuid().required(),

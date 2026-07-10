@@ -1,16 +1,54 @@
 const crypto = require("crypto");
+const bcrypt = require("bcryptjs");
 const supabase = require("../config/database");
 const { computeNombaSignature } = require("../middleware/validateWebhook");
-const { generateReference } = require("../utils/helpers");
+const { generateReference, generateOtpCode } = require("../utils/helpers");
 const env = require("../config/env");
 const { ApiError } = require("../middleware/errorHandler");
 const logger = require("../utils/logger");
+const emailService = require("./emailService");
+const notificationService = require("./notificationService");
+
+const CONFIRMATION_CODE_TTL_MS = 15 * 60 * 1000;
+
+// Generates a fresh 6-digit confirmation code, stores its hash on the
+// request, and delivers it over the two channels this build actually has —
+// email + an in-app notification. No SMS provider (Termii or similar) is
+// configured, so unlike a customer-facing delivery-confirmation code, this
+// can't rely on a third party; it's a 2FA-style check that the account
+// owner really intended to submit this payout request, not proof the
+// underlying work happened.
+async function issueConfirmationCode(payoutRequest, worker) {
+  const code = generateOtpCode();
+  const codeHash = await bcrypt.hash(code, 10);
+  const expiresAt = new Date(Date.now() + CONFIRMATION_CODE_TTL_MS).toISOString();
+
+  const { error } = await supabase
+    .from("payout_requests")
+    .update({ confirmation_code_hash: codeHash, confirmation_code_expires_at: expiresAt, confirmed_at: null })
+    .eq("id", payoutRequest.id);
+  if (error) throw error;
+
+  await Promise.all([
+    emailService.notifications.payoutConfirmationCode(worker.email, code),
+    notificationService.create({
+      workerId: worker.id,
+      type: "payout_confirmation",
+      title: "Confirm your payout request",
+      body: `Your confirmation code is ${code}. Enter it on the Request Payout page to confirm — it expires in 15 minutes.`,
+      tone: "primary",
+    }),
+  ]);
+
+  return expiresAt;
+}
 
 // POST /api/payouts/request — bundles every currently-pending earning into
 // one payout_request. Batched rather than one-request-per-order, matching
 // how real gig platforms pay out (a weekly/batch total), and giving the
 // admin one clear thing to act on per worker instead of a noisy queue.
-async function createPayoutRequest(workerId) {
+async function createPayoutRequest(worker) {
+  const workerId = worker.id;
   const { data: pending, error: pendingError } = await supabase
     .from("earnings")
     .select("*")
@@ -40,7 +78,69 @@ async function createPayoutRequest(workerId) {
     );
   if (updateError) throw updateError;
 
-  return { ...payoutRequest, order_count: pending.length };
+  const confirmationCodeExpiresAt = await issueConfirmationCode(payoutRequest, worker);
+
+  return {
+    ...payoutRequest,
+    order_count: pending.length,
+    confirmation_code_expires_at: confirmationCodeExpiresAt,
+  };
+}
+
+// POST /api/payouts/:id/resend-code — worker didn't get the email in time,
+// or the 15-minute window lapsed. Issues a fresh code, invalidating the
+// previous one (confirmed_at is reset to null by issueConfirmationCode).
+async function resendConfirmationCode({ payoutRequestId, worker }) {
+  const { data: request, error } = await supabase
+    .from("payout_requests")
+    .select("*")
+    .eq("id", payoutRequestId)
+    .eq("worker_id", worker.id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!request) throw new ApiError(404, "not_found", "Payout request not found.");
+  if (request.status !== "requested") {
+    throw new ApiError(409, "already_processed", "This payout request has already been processed.");
+  }
+
+  const confirmationCodeExpiresAt = await issueConfirmationCode(request, worker);
+  return { confirmation_code_expires_at: confirmationCodeExpiresAt };
+}
+
+// POST /api/payouts/:id/confirm — worker enters the code back into the app.
+// Admin can't act on this request (see processPayoutRequest) until this
+// succeeds.
+async function confirmPayoutRequest({ payoutRequestId, workerId, code }) {
+  const { data: request, error } = await supabase
+    .from("payout_requests")
+    .select("*")
+    .eq("id", payoutRequestId)
+    .eq("worker_id", workerId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!request) throw new ApiError(404, "not_found", "Payout request not found.");
+
+  if (request.confirmed_at) {
+    throw new ApiError(409, "already_confirmed", "This payout request is already confirmed.");
+  }
+  if (!request.confirmation_code_hash || new Date(request.confirmation_code_expires_at) < new Date()) {
+    throw new ApiError(401, "code_expired", "That code has expired — request a new one.");
+  }
+
+  const matches = await bcrypt.compare(code, request.confirmation_code_hash);
+  if (!matches) {
+    throw new ApiError(401, "invalid_code", "That code is incorrect.");
+  }
+
+  const { data: confirmed, error: confirmError } = await supabase
+    .from("payout_requests")
+    .update({ confirmed_at: new Date().toISOString(), confirmation_code_hash: null })
+    .eq("id", payoutRequestId)
+    .select()
+    .single();
+  if (confirmError) throw confirmError;
+
+  return confirmed;
 }
 
 async function listForWorker(workerId) {
@@ -98,7 +198,11 @@ async function attachBundledEarnings(requests) {
     earningsByRequest.set(e.payout_request_id, list);
   }
 
-  return requests.map((r) => ({ ...r, earnings: earningsByRequest.get(r.id) || [] }));
+  return requests.map((r) => {
+    // eslint-disable-next-line no-unused-vars
+    const { confirmation_code_hash, ...safe } = r;
+    return { ...safe, earnings: earningsByRequest.get(r.id) || [] };
+  });
 }
 
 // POST /api/payouts/:id/process — the admin action. Fires the same
@@ -109,6 +213,20 @@ async function attachBundledEarnings(requests) {
 // webhook fires, so reconciliationService can match it deterministically —
 // no FIFO guessing needed, since the admin explicitly chose this request.
 async function processPayoutRequest({ payoutRequestId, adminWorkerId, paidAmount }) {
+  const { data: existing, error: existingError } = await supabase
+    .from("payout_requests")
+    .select("status, confirmed_at")
+    .eq("id", payoutRequestId)
+    .maybeSingle();
+  if (existingError) throw existingError;
+  if (!existing) throw new ApiError(404, "not_found", "Payout request not found.");
+  if (existing.status !== "requested") {
+    throw new ApiError(409, "already_processed", "This payout request was already processed.");
+  }
+  if (!existing.confirmed_at) {
+    throw new ApiError(422, "not_confirmed", "The worker hasn't confirmed this payout request yet.");
+  }
+
   const transactionId = generateReference("PAYOUT");
 
   const { data: claimed, error: claimError } = await supabase
@@ -154,7 +272,7 @@ async function processPayoutRequest({ payoutRequestId, adminWorkerId, paidAmount
       },
       customer: {
         senderName: "SwiftSettle Admin",
-        bankName: "Demo Bank",
+        bankName: "Partner Bank",
         accountNumber: "0000000000",
         bankCode: "000",
       },
@@ -191,4 +309,11 @@ async function processPayoutRequest({ payoutRequestId, adminWorkerId, paidAmount
   return resolved;
 }
 
-module.exports = { createPayoutRequest, listForWorker, listAll, processPayoutRequest };
+module.exports = {
+  createPayoutRequest,
+  listForWorker,
+  listAll,
+  processPayoutRequest,
+  confirmPayoutRequest,
+  resendConfirmationCode,
+};

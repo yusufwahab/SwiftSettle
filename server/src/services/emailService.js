@@ -65,6 +65,17 @@ const notifications = {
       `<p>Daily credit repayment: ₦${amount.toLocaleString()} deducted from today's settlement.</p>`
     ),
 
+  // Confirmation code for a payout request — delivered by email + an in-app
+  // notification (notificationService), not SMS. No SMS provider (Termii or
+  // similar) is configured for this build; both channels the worker already
+  // has are used instead of adding that dependency.
+  payoutConfirmationCode: (email, code) =>
+    send(
+      email,
+      "Confirm your payout request",
+      `<p>Your payout confirmation code is <strong>${code}</strong>.</p><p>Enter it on the Request Payout page to confirm. It expires in 15 minutes.</p>`
+    ),
+
   payoutProcessed: (email, { status, expected, received }) => {
     const statusCopy = {
       matched: "in full",

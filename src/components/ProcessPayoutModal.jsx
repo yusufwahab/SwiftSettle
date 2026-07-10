@@ -100,7 +100,7 @@ export default function ProcessPayoutModal({ open, onClose, payoutRequest, onPro
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
         placeholder="0"
-        help="Change this to demo an under/overpayment"
+        help="Can be paid in full, partially, or in excess of what was requested"
       />
 
       <div className="mt-6 flex gap-3">

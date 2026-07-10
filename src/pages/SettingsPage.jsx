@@ -62,7 +62,7 @@ export default function SettingsPage() {
 
       {!worker?.isAdmin && (
         <Card className="mb-6 border border-accent/25">
-          <p className="mb-1 text-sm font-bold text-text-1">Demo Tools</p>
+          <p className="mb-1 text-sm font-bold text-text-1">Admin Access</p>
           <p className="mb-4 text-sm text-text-3">
             Grant your own account admin access to process payout requests from the Admin page — no separate
             login, this just flips a flag on your account.
