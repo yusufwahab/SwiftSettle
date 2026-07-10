@@ -185,6 +185,17 @@ logic itself; the actual amount received is then distributed back across
 the bundled `earnings` rows pro-rata (last row absorbs the rounding
 remainder) so `getBalance` and the scoring queries need no special-casing.
 
+**Underpaid requests aren't a dead end.** `processPayoutRequest` accepts a
+second (third, ...) call on the same request as long as its status is still
+`underpaid` — each call is treated as its own real transfer event (its own
+`nomba_transaction_id`) and reconciliationService.reconcilePayoutRequest
+*adds* the new amount to what was already received rather than overwriting
+it, re-deriving `matched`/`underpaid`/`overpaid` from the running total each
+time. The admin UI surfaces this as a dedicated "Underpaid — Action Needed"
+grid showing requested/received/remaining per request, with a "Pay
+Remaining" action prefilled to the exact gap. `matched`/`overpaid` are
+terminal — no further payment can be logged against those.
+
 Processing a request:
 - Pre-assigns a `nomba_transaction_id` onto the `payout_requests` row *before*
   firing the synthetic webhook, so `reconciliationService` can match it

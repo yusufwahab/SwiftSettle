@@ -104,14 +104,23 @@ async function reconcileDeposit({ workerId, receivedAmount, nombaTransactionId }
 // earnings.received_amount) keep working unmodified. The last earning in
 // the bundle absorbs any rounding remainder so the shares always sum to
 // exactly what was received.
+//
+// Callable more than once for the same request: if the prior call left it
+// `underpaid`, this one's `receivedAmount` is treated as an *additional*
+// payment (a real top-up transfer, its own webhook/transactionId — see
+// payoutRequestService.processPayoutRequest), added to what was already
+// received rather than replacing it. `matched`/`overpaid` are terminal —
+// once reached, further webhooks for this request are duplicates.
 async function reconcilePayoutRequest(payoutRequest, receivedAmount) {
-  if (payoutRequest.status !== "requested") {
+  if (!["requested", "underpaid"].includes(payoutRequest.status)) {
     logger.info("Duplicate payout-request webhook ignored", { payoutRequestId: payoutRequest.id });
     return { duplicate: true };
   }
 
   const expected = Number(payoutRequest.requested_total);
-  const status = receivedAmount === expected ? "matched" : receivedAmount < expected ? "underpaid" : "overpaid";
+  const priorReceived = Number(payoutRequest.received_amount) || 0;
+  const cumulativeReceived = Math.round((priorReceived + receivedAmount) * 100) / 100;
+  const status = cumulativeReceived === expected ? "matched" : cumulativeReceived < expected ? "underpaid" : "overpaid";
 
   const { data: bundledEarnings, error: earningsError } = await supabase
     .from("earnings")
@@ -124,8 +133,8 @@ async function reconcilePayoutRequest(payoutRequest, receivedAmount) {
     const earning = bundledEarnings[i];
     const isLast = i === bundledEarnings.length - 1;
     const share = isLast
-      ? Math.round((receivedAmount - allocated) * 100) / 100
-      : Math.round(((Number(earning.amount) / expected) * receivedAmount) * 100) / 100;
+      ? Math.round((cumulativeReceived - allocated) * 100) / 100
+      : Math.round(((Number(earning.amount) / expected) * cumulativeReceived) * 100) / 100;
     allocated += share;
 
     const { error } = await supabase
@@ -137,7 +146,7 @@ async function reconcilePayoutRequest(payoutRequest, receivedAmount) {
 
   const { data: updated, error } = await supabase
     .from("payout_requests")
-    .update({ received_amount: receivedAmount, status, processed_at: new Date().toISOString() })
+    .update({ received_amount: cumulativeReceived, status, processed_at: new Date().toISOString() })
     .eq("id", payoutRequest.id)
     .select()
     .single();
@@ -146,9 +155,15 @@ async function reconcilePayoutRequest(payoutRequest, receivedAmount) {
   await platformService.recalculateIncomeBaseline(payoutRequest.worker_id);
   await platformService.updateBehavioralData(payoutRequest.worker_id);
 
-  await notifyPayoutOutcome(payoutRequest.worker_id, { status, expected, received: receivedAmount });
+  await notifyPayoutOutcome(payoutRequest.worker_id, { status, expected, received: cumulativeReceived });
 
-  logger.info("Payout request reconciled", { payoutRequestId: payoutRequest.id, expected, receivedAmount, status });
+  logger.info("Payout request reconciled", {
+    payoutRequestId: payoutRequest.id,
+    expected,
+    thisPayment: receivedAmount,
+    cumulativeReceived,
+    status,
+  });
   return { duplicate: false, payoutRequest: updated };
 }
 

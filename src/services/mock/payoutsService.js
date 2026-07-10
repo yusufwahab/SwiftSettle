@@ -99,31 +99,37 @@ export const payoutsService = {
     return simulate([...withWorker].reverse(), { delay: 400 });
   },
 
+  // Callable a second time if the first payment left this `underpaid` —
+  // `amount` here is the *new* payment being made now, added to whatever
+  // was already received, mirroring the live backend's
+  // reconciliationService.reconcilePayoutRequest.
   async process(id, amount) {
     const payoutRequest = payoutRequests.find((r) => r.id === id);
-    if (!payoutRequest || payoutRequest.status !== "requested") {
-      return Promise.reject(new Error("This payout request was already processed or does not exist."));
+    if (!payoutRequest || !["requested", "underpaid"].includes(payoutRequest.status)) {
+      return Promise.reject(new Error("This payout request was already fully processed."));
     }
     if (!payoutRequest.confirmed_at) {
       return Promise.reject(new Error("The worker hasn't confirmed this payout request yet."));
     }
 
     const expected = payoutRequest.requested_total;
-    const status = amount === expected ? "matched" : amount < expected ? "underpaid" : "overpaid";
+    const priorReceived = payoutRequest.received_amount || 0;
+    const cumulative = Math.round((priorReceived + amount) * 100) / 100;
+    const status = cumulative === expected ? "matched" : cumulative < expected ? "underpaid" : "overpaid";
 
     let allocated = 0;
     payoutRequest.earnings.forEach((order, index) => {
       const isLast = index === payoutRequest.earnings.length - 1;
       const share = isLast
-        ? Math.round((amount - allocated) * 100) / 100
-        : Math.round(((order.amount / expected) * amount) * 100) / 100;
+        ? Math.round((cumulative - allocated) * 100) / 100
+        : Math.round(((order.amount / expected) * cumulative) * 100) / 100;
       allocated += share;
       order.status = status;
       order.receivedAmount = share;
     });
 
     payoutRequest.status = status;
-    payoutRequest.received_amount = amount;
+    payoutRequest.received_amount = cumulative;
     payoutRequest.processed_at = new Date().toISOString();
 
     return simulate({ payout_request: payoutRequest }, { delay: 900 });

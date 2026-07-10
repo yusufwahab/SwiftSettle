@@ -10,6 +10,14 @@ function mapRow(row) {
     time: created.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
     amount: Number(row.amount),
     status: STATUS_MAP[row.status] || "Pending",
+    // Kept for the "View" detail modal — getHistory's select("*") already
+    // returns these, mapRow just used to drop them on the floor.
+    bank: row.destination_bank || null,
+    account: row.destination_account || null,
+    settledAt: row.settled_at
+      ? new Date(row.settled_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+      : null,
+    errorMessage: row.error_message || null,
   };
 }
 

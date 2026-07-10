@@ -23,7 +23,8 @@ export default function AdminPayoutsPage() {
   }
 
   const open = (requestsState.data || []).filter((r) => r.status === "requested");
-  const processed = (requestsState.data || []).filter((r) => r.status !== "requested");
+  const underpaid = (requestsState.data || []).filter((r) => r.status === "underpaid");
+  const processed = (requestsState.data || []).filter((r) => r.status === "matched" || r.status === "overpaid");
 
   return (
     <AppLayout
@@ -84,6 +85,43 @@ export default function AdminPayoutsPage() {
         )}
       </Card>
 
+      {requestsState.status === "success" && underpaid.length > 0 && (
+        <Card className="mb-5 border border-warning-vivid/25">
+          <p className="mb-4 text-sm font-bold text-text-1">Underpaid — Action Needed</p>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {underpaid.map((r) => {
+              const remaining = Number(r.requested_total) - Number(r.received_amount || 0);
+              return (
+                <div key={r.id} className="rounded-xl border border-warning-vivid/20 bg-warning-vivid/6 p-4">
+                  <p className="truncate text-sm font-medium text-text-1">{r.worker?.full_name || r.worker_id}</p>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-text-3">Requested</p>
+                      <p className="mt-0.5 text-sm font-bold text-text-1">{formatNaira(r.requested_total)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-text-3">Received</p>
+                      <p className="mt-0.5 text-sm font-bold text-text-1">{formatNaira(r.received_amount)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-text-3">Remaining</p>
+                      <p className="mt-0.5 text-sm font-bold text-warning-vivid">{formatNaira(remaining)}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTarget(r)}
+                    className="mt-4 w-full rounded-lg bg-warning-vivid px-3 py-1.5 text-xs font-medium text-[#3d1a00] hover:opacity-90"
+                  >
+                    Pay Remaining {formatNaira(remaining)}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
       <Card>
         <p className="mb-4 text-sm font-bold text-text-1">Processed</p>
         {requestsState.status === "success" && processed.length === 0 && (
@@ -112,6 +150,7 @@ export default function AdminPayoutsPage() {
       </Card>
 
       <ProcessPayoutModal
+        key={target?.id || "none"}
         open={Boolean(target)}
         onClose={() => setTarget(null)}
         payoutRequest={target}

@@ -205,6 +205,11 @@ async function attachBundledEarnings(requests) {
   });
 }
 
+// Terminal — once a request reaches either of these, no further payment
+// can be logged against it. "requested" (not yet paid) and "underpaid" (paid
+// less than requested_total) both still accept a payment.
+const PAYABLE_STATUSES = ["requested", "underpaid"];
+
 // POST /api/payouts/:id/process — the admin action. Fires the same
 // real-signed synthetic payment_success webhook the direct demo path uses
 // (see earningsController.simulateCustomerPayment for why Nomba's sandbox
@@ -212,6 +217,14 @@ async function attachBundledEarnings(requests) {
 // transactionId is pre-assigned onto the payout_request *before* the
 // webhook fires, so reconciliationService can match it deterministically —
 // no FIFO guessing needed, since the admin explicitly chose this request.
+//
+// Callable a second time on the same request if the first payment left it
+// `underpaid` — this pays the *remaining* balance (or whatever amount the
+// admin enters), which reconciliationService.reconcilePayoutRequest adds to
+// what was already received rather than replacing it. A fresh
+// nomba_transaction_id is generated each call since each represents its own
+// real transfer event; confirmed_at from the worker's original confirmation
+// still applies — completing an underpayment doesn't require a new code.
 async function processPayoutRequest({ payoutRequestId, adminWorkerId, paidAmount }) {
   const { data: existing, error: existingError } = await supabase
     .from("payout_requests")
@@ -220,8 +233,8 @@ async function processPayoutRequest({ payoutRequestId, adminWorkerId, paidAmount
     .maybeSingle();
   if (existingError) throw existingError;
   if (!existing) throw new ApiError(404, "not_found", "Payout request not found.");
-  if (existing.status !== "requested") {
-    throw new ApiError(409, "already_processed", "This payout request was already processed.");
+  if (!PAYABLE_STATUSES.includes(existing.status)) {
+    throw new ApiError(409, "already_processed", "This payout request was already fully processed.");
   }
   if (!existing.confirmed_at) {
     throw new ApiError(422, "not_confirmed", "The worker hasn't confirmed this payout request yet.");
@@ -233,11 +246,11 @@ async function processPayoutRequest({ payoutRequestId, adminWorkerId, paidAmount
     .from("payout_requests")
     .update({ nomba_transaction_id: transactionId, processed_by: adminWorkerId })
     .eq("id", payoutRequestId)
-    .eq("status", "requested")
+    .in("status", PAYABLE_STATUSES)
     .select()
     .single();
   if (claimError || !claimed) {
-    throw new ApiError(409, "already_processed", "This payout request was already processed or does not exist.");
+    throw new ApiError(409, "already_processed", "This payout request was already fully processed.");
   }
 
   const { data: virtualAccount, error: vaError } = await supabase

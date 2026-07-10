@@ -4,6 +4,7 @@ import Card from "../components/ui/Card";
 import Badge from "../components/ui/dark/Badge";
 import Skeleton from "../components/ui/dark/Skeleton";
 import { ErrorState, EmptyState } from "../components/ui/dark/States";
+import SettlementDetailModal from "../components/SettlementDetailModal";
 import { formatNaira } from "../lib/format";
 import { settlementsService } from "../services";
 import { useAsync } from "../hooks/useAsync";
@@ -14,6 +15,7 @@ const badgeTone = { Completed: "success", Pending: "warning", Failed: "danger" }
 export default function SettlementsPage() {
   const [status, setStatus] = useState("All");
   const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState(null);
 
   const rowsState = useAsync(() => settlementsService.list({ status, search }), [status, search]);
   const summaryState = useAsync(() => settlementsService.getSummary(), []);
@@ -99,7 +101,11 @@ export default function SettlementsPage() {
                     <Badge tone={badgeTone[row.status]}>{row.status}</Badge>
                   </td>
                   <td className="px-4 py-3">
-                    <button type="button" className="text-accent hover:text-accent-dark">
+                    <button
+                      type="button"
+                      onClick={() => setSelected(row)}
+                      className="text-accent hover:text-accent-dark"
+                    >
                       View
                     </button>
                   </td>
@@ -130,7 +136,9 @@ export default function SettlementsPage() {
               <p className="mt-1.5 text-2xl font-bold text-text-1">
                 {formatNaira(summaryState.data?.pendingAmount ?? 0)}
               </p>
-              <p className="mt-1.5 text-xs text-accent-2">None pending</p>
+              <p className="mt-1.5 text-xs text-accent-2">
+                {summaryState.data?.pendingAmount ? "Still processing" : "None pending"}
+              </p>
             </>
           )}
         </Card>
@@ -146,6 +154,8 @@ export default function SettlementsPage() {
           )}
         </Card>
       </div>
+
+      <SettlementDetailModal settlement={selected} onClose={() => setSelected(null)} />
     </AppLayout>
   );
 }
